@@ -12,7 +12,7 @@ class FloatingPanel: NSPanel {
 
         isFloatingPanel = true
         level = .floating
-        isMovableByWindowBackground = true
+        isMovableByWindowBackground = false
         hasShadow = true
 
         isOpaque = false

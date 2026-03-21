@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @Bindable var viewModel: SearchViewModel
     @State private var showSettings = false
+    @State private var showAlbumPicker = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -13,6 +14,9 @@ struct ContentView: View {
                     query: $viewModel.query,
                     isLoading: viewModel.isLoading,
                     indexedCount: viewModel.indexedCount,
+                    isSelectMode: viewModel.isSelectMode,
+                    hasResults: !viewModel.results.isEmpty,
+                    onSelectToggle: { viewModel.toggleSelectMode() },
                     onSettingsTap: { showSettings = true }
                 )
 
@@ -27,8 +31,24 @@ struct ContentView: View {
                 } else {
                     PhotoGrid(
                         results: viewModel.results,
+                        selectedUUIDs: viewModel.selectedUUIDs,
+                        isSelectMode: viewModel.isSelectMode,
                         isLoadingMore: viewModel.isLoadingMore,
+                        onSelect: { viewModel.toggleSelection($0) },
                         onReachEnd: { Task { await viewModel.loadMore() } }
+                    )
+                }
+
+                if viewModel.hasSelection {
+                    Divider()
+                    ActionBar(
+                        selectedCount: viewModel.selectedCount,
+                        onFavorite: { viewModel.favoriteSelected() },
+                        onUnfavorite: { viewModel.unfavoriteSelected() },
+                        onAddToAlbum: { showAlbumPicker = true },
+                        onNewAlbum: { showAlbumPicker = true },
+                        onDelete: { viewModel.confirmDelete() },
+                        onClearSelection: { viewModel.clearSelection() }
                     )
                 }
             }
@@ -43,6 +63,22 @@ struct ContentView: View {
             SettingsView(viewModel: viewModel)
                 .background(.ultraThinMaterial)
                 .preferredColorScheme(.dark)
+        }
+        .alert("Delete \(viewModel.selectedCount) photo\(viewModel.selectedCount == 1 ? "" : "s")?",
+               isPresented: $viewModel.showDeleteConfirmation) {
+            Button("Delete", role: .destructive) { viewModel.deleteSelected() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will move \(viewModel.selectedCount == 1 ? "this photo" : "these photos") to Recently Deleted in Photos.")
+        }
+        .sheet(isPresented: $showAlbumPicker) {
+            AlbumPickerSheet(
+                albums: PhotosActions.fetchAlbumNames(),
+                onSelect: { viewModel.addSelectedToAlbum($0) },
+                onCreateNew: { viewModel.createAlbumWithSelected($0) }
+            )
+            .background(.ultraThinMaterial)
+            .preferredColorScheme(.dark)
         }
     }
 

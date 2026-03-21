@@ -24,6 +24,13 @@ final class SearchViewModel {
     var indexingTotal = 0
     var indexingDone = 0
 
+    // Selection state
+    var isSelectMode = false
+    var selectedUUIDs: Set<String> = []
+    var showDeleteConfirmation = false
+    var hasSelection: Bool { !selectedUUIDs.isEmpty }
+    var selectedCount: Int { selectedUUIDs.count }
+
     var hasApiKey: Bool { SettingsManager.shared.hasApiKey }
 
     private var searchTask: Task<Void, Never>?
@@ -180,5 +187,60 @@ final class SearchViewModel {
 
     func stopIndexing() {
         isIndexing = false
+    }
+
+    // MARK: - Selection
+
+    func toggleSelection(_ uuid: String) {
+        if selectedUUIDs.contains(uuid) {
+            selectedUUIDs.remove(uuid)
+        } else {
+            selectedUUIDs.insert(uuid)
+        }
+    }
+
+    func selectAll() {
+        selectedUUIDs = Set(results.map(\.uuid))
+    }
+
+    func clearSelection() {
+        selectedUUIDs.removeAll()
+        isSelectMode = false
+    }
+
+    func toggleSelectMode() {
+        isSelectMode.toggle()
+        if !isSelectMode {
+            selectedUUIDs.removeAll()
+        }
+    }
+
+    func favoriteSelected() {
+        PhotosActions.favorite(Array(selectedUUIDs))
+        clearSelection()
+    }
+
+    func unfavoriteSelected() {
+        PhotosActions.unfavorite(Array(selectedUUIDs))
+        clearSelection()
+    }
+
+    func confirmDelete() {
+        showDeleteConfirmation = true
+    }
+
+    func deleteSelected() {
+        PhotosActions.deletePhotos(Array(selectedUUIDs))
+        clearSelection()
+    }
+
+    func addSelectedToAlbum(_ albumName: String) {
+        PhotosActions.addToAlbum(Array(selectedUUIDs), albumName: albumName)
+        clearSelection()
+    }
+
+    func createAlbumWithSelected(_ albumName: String) {
+        PhotosActions.createAlbumAndAdd(Array(selectedUUIDs), albumName: albumName)
+        clearSelection()
     }
 }

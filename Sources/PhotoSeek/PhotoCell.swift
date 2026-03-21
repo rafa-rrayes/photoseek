@@ -3,6 +3,9 @@ import AppKit
 
 struct PhotoCell: View {
     let result: SearchResult
+    var isSelected: Bool = false
+    var isSelectMode: Bool = false
+    var onSelect: (() -> Void)?
     @State private var image: NSImage?
     @State private var isHovered = false
 
@@ -40,21 +43,55 @@ struct PhotoCell: View {
                     )
                 )
             }
+
+            // Selection checkmark (only in select mode)
+            if isSelectMode {
+                ZStack {
+                    if isSelected {
+                        Circle()
+                            .fill(.blue)
+                            .frame(width: 24, height: 24)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                    } else {
+                        Circle()
+                            .fill(.black.opacity(0.4))
+                            .frame(width: 24, height: 24)
+                        Circle()
+                            .strokeBorder(.white.opacity(0.8), lineWidth: 2)
+                            .frame(width: 24, height: 24)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(8)
+            }
         }
         .aspectRatio(1, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(.blue, lineWidth: isSelected ? 3 : 0)
+        )
         .scaleEffect(isHovered ? 1.03 : 1.0)
         .shadow(color: .black.opacity(isHovered ? 0.3 : 0.1), radius: isHovered ? 8 : 2)
         .animation(.easeOut(duration: 0.15), value: isHovered)
+        .animation(.easeOut(duration: 0.15), value: isSelected)
         .onHover { isHovered = $0 }
-        .onTapGesture { openPhoto() }
+        .onTapGesture {
+            if isSelectMode {
+                onSelect?()
+            } else {
+                PhotosActions.openInPhotos(result.uuid)
+            }
+        }
         .help(result.filename)
         .task(id: result.uuid) {
             let loadPath = !result.derivative.isEmpty ? result.derivative : result.path
             image = await ImageCache.shared.image(for: loadPath)
         }
         .contextMenu {
-            Button("Open in Photos") { openPhoto() }
+            Button("Open in Photos") { PhotosActions.openInPhotos(result.uuid) }
             if FileManager.default.fileExists(atPath: result.path) {
                 Button("Open in Preview") {
                     NSWorkspace.shared.open(URL(fileURLWithPath: result.path))
@@ -63,19 +100,6 @@ struct PhotoCell: View {
                     NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: result.path)])
                 }
             }
-        }
-    }
-
-    private func openPhoto() {
-        let script = """
-            tell application "Photos"
-                activate
-                spotlight media item id "\(result.uuid)/L0/001"
-            end tell
-            """
-        if let appleScript = NSAppleScript(source: script) {
-            var error: NSDictionary?
-            appleScript.executeAndReturnError(&error)
         }
     }
 }
