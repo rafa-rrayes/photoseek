@@ -9,6 +9,32 @@ struct PhotoCell: View {
     @State private var image: NSImage?
     @State private var isHovered = false
 
+    @ViewBuilder
+    private var scoreIndicator: some View {
+        if SettingsManager.shared.showSimilarityPercent {
+            Text("\(Int(result.score * 100))%")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+        } else {
+            HStack(spacing: 3) {
+                switch result.score {
+                case 0.4...:
+                    dot(.green); dot(.green); dot(.green)
+                case 0.35..<0.4:
+                    dot(.yellow); dot(.yellow)
+                default:
+                    dot(.red)
+                }
+            }
+        }
+    }
+
+    private func dot(_ color: Color) -> some View {
+        Circle()
+            .fill(color)
+            .frame(width: 7, height: 7)
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             if let image {
@@ -28,9 +54,7 @@ struct PhotoCell: View {
 
             if image != nil {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(Int(result.score * 100))%")
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                    scoreIndicator
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 8)
@@ -68,7 +92,9 @@ struct PhotoCell: View {
             }
         }
         .aspectRatio(1, contentMode: .fit)
+        .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .contentShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .strokeBorder(.blue, lineWidth: isSelected ? 3 : 0)

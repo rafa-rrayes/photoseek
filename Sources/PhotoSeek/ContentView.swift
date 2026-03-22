@@ -55,6 +55,7 @@ struct ContentView: View {
         }
         .frame(width: 680, height: 520)
         .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .preferredColorScheme(.dark)
         .task {
             await viewModel.loadStore()
@@ -90,20 +91,41 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
             Text("PhotoSeek")
                 .font(.system(size: 22, weight: .semibold))
-            Text("Enter your Gemini API key to get started")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
 
-            SecureField("Paste your API key", text: Bindable(SettingsManager.shared).apiKey)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 13, design: .monospaced))
-                .frame(width: 350)
-                .padding(.top, 8)
+            if !SettingsManager.shared.hasApiKey {
+                Text("Search your photos using natural language")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
 
-            if SettingsManager.shared.hasApiKey {
-                Label("Key saved", systemImage: "checkmark.circle.fill")
+                VStack(spacing: 8) {
+                    Text("You need a Gemini API key (free) to get started.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+
+                    Link("Get your free API key at Google AI Studio",
+                         destination: URL(string: "https://aistudio.google.com/apikey")!)
+                        .font(.system(size: 13))
+                }
+
+                SecureField("Paste your API key", text: Bindable(SettingsManager.shared).apiKey)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 13, design: .monospaced))
+                    .frame(width: 350)
+                    .padding(.top, 4)
+            } else {
+                Label("API key saved", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
                     .font(.system(size: 13))
+
+                Text("Now index your photo library so PhotoSeek can search it.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+
+                Button("Open Settings to Start Indexing") {
+                    showSettings = true
+                }
+                .controlSize(.large)
             }
 
             Spacer()
@@ -116,13 +138,21 @@ struct ContentView: View {
             Image(systemName: "sparkle.magnifyingglass")
                 .font(.system(size: 40))
                 .foregroundStyle(.tertiary)
-            Text("Search your photos with natural language")
-                .font(.system(size: 14))
-                .foregroundStyle(.secondary)
             if viewModel.indexedCount > 0 {
+                Text("Search your photos with natural language")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
                 Text("\(viewModel.indexedCount) photos indexed")
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
+            } else {
+                Text("No photos indexed yet")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+                Button("Open Settings to Index Photos") {
+                    showSettings = true
+                }
+                .font(.system(size: 12))
             }
             Spacer()
         }

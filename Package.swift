@@ -9,7 +9,11 @@ let package = Package(
         .executableTarget(
             name: "PhotoSeek",
             path: "Sources/PhotoSeek",
-            exclude: ["Resources"],
+            exclude: ["Resources/Info.plist", "Resources/PhotoSeek.entitlements", "Resources/AppIcon.icns"],
+            resources: [
+                .copy("Resources/MenuBarIcon.png"),
+                .copy("Resources/MenuBarIcon@2x.png"),
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v5)
             ]

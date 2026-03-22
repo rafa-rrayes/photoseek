@@ -26,5 +26,7 @@
     <string>PhotoSeek needs access to your Photos library to index and search your photos.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>PhotoSeek uses AppleScript to open photos in the Photos app.</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright 2026 Rafa. All rights reserved.</string>
 </dict>
 </plist>

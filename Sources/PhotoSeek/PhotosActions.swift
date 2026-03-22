@@ -7,14 +7,20 @@ enum PhotosActions {
     }
 
     @discardableResult
-    private static func run(_ source: String) -> Bool {
-        guard let script = NSAppleScript(source: source) else { return false }
+    private static func run(_ source: String) -> String? {
+        guard let script = NSAppleScript(source: source) else {
+            return "Failed to create script"
+        }
         var error: NSDictionary?
         script.executeAndReturnError(&error)
-        return error == nil
+        if let error {
+            return (error[NSAppleScript.errorMessage] as? String) ?? "Photos action failed"
+        }
+        return nil
     }
 
-    static func openInPhotos(_ uuid: String) {
+    @discardableResult
+    static func openInPhotos(_ uuid: String) -> String? {
         run("""
             tell application "Photos"
                 activate
@@ -23,9 +29,10 @@ enum PhotosActions {
             """)
     }
 
-    static func favorite(_ uuids: [String]) {
+    @discardableResult
+    static func favorite(_ uuids: [String]) -> String? {
         let refs = mediaItemRefs(uuids)
-        run("""
+        return run("""
             tell application "Photos"
                 set theItems to {\(refs)}
                 repeat with anItem in theItems
@@ -35,9 +42,10 @@ enum PhotosActions {
             """)
     }
 
-    static func unfavorite(_ uuids: [String]) {
+    @discardableResult
+    static func unfavorite(_ uuids: [String]) -> String? {
         let refs = mediaItemRefs(uuids)
-        run("""
+        return run("""
             tell application "Photos"
                 set theItems to {\(refs)}
                 repeat with anItem in theItems
@@ -59,9 +67,10 @@ enum PhotosActions {
         // macOS will show a system confirmation dialog
     }
 
-    static func addToAlbum(_ uuids: [String], albumName: String) {
+    @discardableResult
+    static func addToAlbum(_ uuids: [String], albumName: String) -> String? {
         let refs = mediaItemRefs(uuids)
-        run("""
+        return run("""
             tell application "Photos"
                 set theAlbum to album "\(albumName)"
                 add {\(refs)} to theAlbum
@@ -69,9 +78,10 @@ enum PhotosActions {
             """)
     }
 
-    static func createAlbumAndAdd(_ uuids: [String], albumName: String) {
+    @discardableResult
+    static func createAlbumAndAdd(_ uuids: [String], albumName: String) -> String? {
         let refs = mediaItemRefs(uuids)
-        run("""
+        return run("""
             tell application "Photos"
                 set newAlbum to make new album named "\(albumName)"
                 add {\(refs)} to newAlbum

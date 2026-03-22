@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import SQLite3
 
 @MainActor
 @Observable
@@ -120,14 +121,18 @@ final class SearchViewModel {
         let fm = FileManager.default
         let extensions = Set(["heic", "heif", "jpg", "jpeg", "png", "tiff", "webp"])
 
-        // Gather image files
+        // Load visible photo UUIDs from Photos.sqlite
+        let visibleUUIDs = loadVisiblePhotoUUIDs()
+
+        // Gather image files, filtering to visible photos only
         var imagePaths: [String] = []
         if let enumerator = fm.enumerator(atPath: directoryPath) {
             while let file = enumerator.nextObject() as? String {
                 let ext = (file as NSString).pathExtension.lowercased()
-                if extensions.contains(ext) {
-                    imagePaths.append((directoryPath as NSString).appendingPathComponent(file))
-                }
+                guard extensions.contains(ext) else { continue }
+                let name = ((file as NSString).lastPathComponent as NSString).deletingPathExtension
+                guard visibleUUIDs.contains(name) else { continue }
+                imagePaths.append((directoryPath as NSString).appendingPathComponent(file))
             }
         }
 
@@ -176,17 +181,120 @@ final class SearchViewModel {
                 )
                 indexingDone += 1
                 indexedCount = await store.count
+            } catch let error as GeminiClient.GeminiError where error == .rateLimited {
+                // Wait and retry on rate limit
+                try? await Task.sleep(for: .seconds(2))
+                continue
             } catch {
-                errorMessage = "Index error: \(error.localizedDescription)"
+                errorMessage = error.localizedDescription
                 indexingDone += 1
             }
         }
 
         isIndexing = false
+        SettingsManager.shared.lastIndexedDate = Date()
     }
 
     func stopIndexing() {
         isIndexing = false
+    }
+
+    func indexAllFolders() async {
+        let folders = SettingsManager.shared.indexFolders
+        for folder in folders {
+            guard isIndexing || !isIndexing else { break }
+            await indexPhotos(from: folder)
+        }
+        SettingsManager.shared.lastIndexedDate = Date()
+    }
+
+    func reindexAll() async {
+        do {
+            try await store.clearAll()
+            indexedCount = 0
+            await indexAllFolders()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func clearIndex() async {
+        do {
+            try await store.clearAll()
+            indexedCount = 0
+            results = []
+            lastEmbedding = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    struct LibraryStats {
+        var totalPhotos: Int = 0
+        var localAvailable: Int = 0
+        var iCloudOnly: Int { max(totalPhotos - localAvailable, 0) }
+    }
+
+    func scanLibraryStats() async -> LibraryStats {
+        var stats = LibraryStats()
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let dbPath = "\(home)/Pictures/Photos Library.photoslibrary/database/Photos.sqlite"
+
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+            return stats
+        }
+        defer { sqlite3_close(db) }
+
+        // Total visible photos (not trashed, not hidden, visible)
+        stats.totalPhotos = queryCount(db, """
+            SELECT COUNT(*) FROM ZASSET
+            WHERE ZKIND = 0 AND ZTRASHEDSTATE = 0 AND ZHIDDEN = 0 AND ZVISIBILITYSTATE = 0
+            """)
+
+        // Locally available photos
+        stats.localAvailable = queryCount(db, """
+            SELECT COUNT(*) FROM ZASSET
+            WHERE ZKIND = 0 AND ZTRASHEDSTATE = 0 AND ZHIDDEN = 0 AND ZVISIBILITYSTATE = 0
+            AND ZCLOUDLOCALSTATE = 1
+            """)
+
+        return stats
+    }
+
+    private func queryCount(_ db: OpaquePointer?, _ sql: String) -> Int {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
+        defer { sqlite3_finalize(stmt) }
+        guard sqlite3_step(stmt) == SQLITE_ROW else { return 0 }
+        return Int(sqlite3_column_int64(stmt, 0))
+    }
+
+    private func loadVisiblePhotoUUIDs() -> Set<String> {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let dbPath = "\(home)/Pictures/Photos Library.photoslibrary/database/Photos.sqlite"
+
+        var db: OpaquePointer?
+        guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+            return []
+        }
+        defer { sqlite3_close(db) }
+
+        let sql = """
+            SELECT ZUUID FROM ZASSET
+            WHERE ZKIND = 0 AND ZTRASHEDSTATE = 0 AND ZHIDDEN = 0 AND ZVISIBILITYSTATE = 0
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+
+        var uuids: Set<String> = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let cStr = sqlite3_column_text(stmt, 0) {
+                uuids.insert(String(cString: cStr))
+            }
+        }
+        return uuids
     }
 
     // MARK: - Selection
@@ -216,12 +324,16 @@ final class SearchViewModel {
     }
 
     func favoriteSelected() {
-        PhotosActions.favorite(Array(selectedUUIDs))
+        if let error = PhotosActions.favorite(Array(selectedUUIDs)) {
+            errorMessage = error
+        }
         clearSelection()
     }
 
     func unfavoriteSelected() {
-        PhotosActions.unfavorite(Array(selectedUUIDs))
+        if let error = PhotosActions.unfavorite(Array(selectedUUIDs)) {
+            errorMessage = error
+        }
         clearSelection()
     }
 
@@ -235,12 +347,16 @@ final class SearchViewModel {
     }
 
     func addSelectedToAlbum(_ albumName: String) {
-        PhotosActions.addToAlbum(Array(selectedUUIDs), albumName: albumName)
+        if let error = PhotosActions.addToAlbum(Array(selectedUUIDs), albumName: albumName) {
+            errorMessage = error
+        }
         clearSelection()
     }
 
     func createAlbumWithSelected(_ albumName: String) {
-        PhotosActions.createAlbumAndAdd(Array(selectedUUIDs), albumName: albumName)
+        if let error = PhotosActions.createAlbumAndAdd(Array(selectedUUIDs), albumName: albumName) {
+            errorMessage = error
+        }
         clearSelection()
     }
 }

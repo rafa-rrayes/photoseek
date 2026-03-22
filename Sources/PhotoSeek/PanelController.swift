@@ -43,10 +43,14 @@ class PanelController {
         panel = FloatingPanel(contentRect: panelRect)
 
         let hostingView = NSHostingView(rootView: ContentView(viewModel: viewModel))
-        hostingView.wantsLayer = true
-        hostingView.layer?.cornerRadius = 16
-        hostingView.layer?.masksToBounds = true
         panel.contentView = hostingView
+
+        // Apply corner radius at the window level so sheets can't override it
+        if let windowContentView = panel.contentView?.superview {
+            windowContentView.wantsLayer = true
+            windowContentView.layer?.cornerRadius = 16
+            windowContentView.layer?.masksToBounds = true
+        }
     }
 
     func toggle() {

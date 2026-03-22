@@ -173,6 +173,22 @@ actor VectorStore {
         uuidSet.insert(uuid)
     }
 
+    func clearAll() throws {
+        guard let db else { throw StoreError.notOpen }
+        guard sqlite3_exec(db, "DELETE FROM photos", nil, nil, nil) == SQLITE_OK else {
+            throw StoreError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        photos.removeAll()
+        uuidSet.removeAll()
+    }
+
+    func close() {
+        if let db {
+            sqlite3_close(db)
+            self.db = nil
+        }
+    }
+
     // MARK: - Private
 
     private func createTable() throws {

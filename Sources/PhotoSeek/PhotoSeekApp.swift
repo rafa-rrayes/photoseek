@@ -6,8 +6,8 @@ struct PhotoSeekApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
 
     var body: some Scene {
-        MenuBarExtra("PhotoSeek", systemImage: "sparkle.magnifyingglass") {
-            Button("Search Photos  \u{2318}\u{21E7}F") {
+        MenuBarExtra {
+            Button("Search Photos") {
                 delegate.togglePanel()
             }
             Divider()
@@ -15,16 +15,27 @@ struct PhotoSeekApp: App {
                 NSApp.terminate(nil)
             }
             .keyboardShortcut("q")
+        } label: {
+            Image(nsImage: Self.menuBarIcon)
         }
+    }
+
+    private static var menuBarIcon: NSImage {
+        guard let path = Bundle.module.path(forResource: "MenuBarIcon", ofType: "png"),
+              let image = NSImage(contentsOfFile: path) else {
+            return NSImage()
+        }
+        image.size = NSSize(width: 22, height: 22)
+        image.isTemplate = true
+        return image
     }
 }
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var panelController: PanelController!
-    private let hotkeyManager = HotkeyManager()
     private let store = VectorStore()
-    private var viewModel: SearchViewModel!
+    private(set) var viewModel: SearchViewModel!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -32,16 +43,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         viewModel = SearchViewModel(store: store)
         panelController = PanelController(viewModel: viewModel)
 
-        hotkeyManager.onToggle = { [weak self] in
-            DispatchQueue.main.async {
-                self?.togglePanel()
-            }
-        }
-        hotkeyManager.register()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        hotkeyManager.unregister()
+        Task { await store.close() }
     }
 
     func togglePanel() {

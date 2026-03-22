@@ -41,11 +41,27 @@ actor GeminiClient {
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch let urlError as URLError where urlError.code == .timedOut {
+            throw GeminiError.networkTimeout
+        } catch let urlError as URLError {
+            throw GeminiError.networkError(urlError.localizedDescription)
+        }
 
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            let msg = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw GeminiError.apiError(http.statusCode, msg)
+            switch http.statusCode {
+            case 400, 403:
+                throw GeminiError.invalidKey
+            case 429:
+                throw GeminiError.rateLimited
+            case 500...599:
+                throw GeminiError.serverError
+            default:
+                throw GeminiError.unknown(http.statusCode)
+            }
         }
 
         let result = try JSONDecoder().decode(EmbedResponse.self, from: data)
@@ -60,12 +76,28 @@ actor GeminiClient {
         let values: [Float]
     }
 
-    enum GeminiError: LocalizedError {
-        case apiError(Int, String)
+    enum GeminiError: LocalizedError, Equatable {
+        case invalidKey
+        case rateLimited
+        case networkTimeout
+        case networkError(String)
+        case serverError
+        case unknown(Int)
 
         var errorDescription: String? {
             switch self {
-            case .apiError(let code, let msg): return "Gemini API error \(code): \(msg)"
+            case .invalidKey:
+                return "Invalid API key. Check your key in Settings."
+            case .rateLimited:
+                return "Too many requests. Wait a moment and try again."
+            case .networkTimeout:
+                return "Request timed out. Check your internet connection."
+            case .networkError(let detail):
+                return "Network error: \(detail)"
+            case .serverError:
+                return "Gemini service is temporarily unavailable. Try again shortly."
+            case .unknown(let code):
+                return "Something went wrong (error \(code)). Try again."
             }
         }
     }
