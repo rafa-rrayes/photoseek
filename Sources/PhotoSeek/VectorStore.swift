@@ -28,6 +28,10 @@ actor VectorStore {
         uuidSet.contains(uuid)
     }
 
+    func indexedUUIDs() -> Set<String> {
+        uuidSet
+    }
+
     func open(at path: String) throws {
         let dir = (path as NSString).deletingLastPathComponent
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)

@@ -136,15 +136,13 @@ final class SearchViewModel {
             }
         }
 
-        // Filter out already-indexed
-        var toIndex: [(path: String, uuid: String)] = []
-        for path in imagePaths {
+        // Bulk check already-indexed (single actor hop instead of N)
+        let indexedUUIDs = await store.indexedUUIDs()
+        let toIndex: [(path: String, uuid: String)] = imagePaths.compactMap { path in
             let filename = (path as NSString).lastPathComponent
             let uuid = (filename as NSString).deletingPathExtension
-            let alreadyIndexed = await store.contains(uuid: uuid)
-            if !alreadyIndexed {
-                toIndex.append((path, uuid))
-            }
+            guard !indexedUUIDs.contains(uuid) else { return nil }
+            return (path, uuid)
         }
 
         indexingTotal = toIndex.count
@@ -154,15 +152,43 @@ final class SearchViewModel {
         }
 
         let apiKey = SettingsManager.shared.apiKey
+        let concurrency = 5
 
-        for (path, uuid) in toIndex {
-            guard isIndexing else { break } // allow cancellation
+        await withTaskGroup(of: Void.self) { group in
+            var iter = toIndex.makeIterator()
 
-            guard let jpegData = await ImageCache.shared.prepareForEmbedding(at: path) else {
-                indexingDone += 1
-                continue
+            // Seed with initial concurrent tasks
+            for _ in 0..<concurrency {
+                guard let item = iter.next() else { break }
+                group.addTask { await self.indexSinglePhoto(path: item.path, uuid: item.uuid, apiKey: apiKey) }
             }
 
+            // As each completes, start the next
+            for await _ in group {
+                guard self.isIndexing else {
+                    group.cancelAll()
+                    break
+                }
+                if let item = iter.next() {
+                    group.addTask { await self.indexSinglePhoto(path: item.path, uuid: item.uuid, apiKey: apiKey) }
+                }
+            }
+        }
+
+        isIndexing = false
+        SettingsManager.shared.lastIndexedDate = Date()
+    }
+
+    private func indexSinglePhoto(path: String, uuid: String, apiKey: String) async {
+        let fm = FileManager.default
+
+        guard let jpegData = await ImageCache.shared.prepareForEmbedding(at: path) else {
+            indexingDone += 1
+            return
+        }
+
+        var attempt = 0
+        while attempt < 3 {
             do {
                 let embedding = try await gemini.embedImage(jpegData, apiKey: apiKey)
                 let filename = (path as NSString).lastPathComponent
@@ -181,18 +207,17 @@ final class SearchViewModel {
                 )
                 indexingDone += 1
                 indexedCount = await store.count
+                return
             } catch let error as GeminiClient.GeminiError where error == .rateLimited {
-                // Wait and retry on rate limit
-                try? await Task.sleep(for: .seconds(2))
-                continue
+                attempt += 1
+                try? await Task.sleep(for: .seconds(Double(attempt) * 2))
             } catch {
                 errorMessage = error.localizedDescription
                 indexingDone += 1
+                return
             }
         }
-
-        isIndexing = false
-        SettingsManager.shared.lastIndexedDate = Date()
+        indexingDone += 1 // exhausted retries
     }
 
     func stopIndexing() {
