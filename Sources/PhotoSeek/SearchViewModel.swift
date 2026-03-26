@@ -124,23 +124,44 @@ final class SearchViewModel {
         // Load visible photo UUIDs from Photos.sqlite
         let visibleUUIDs = loadVisiblePhotoUUIDs()
 
-        // Gather image files, filtering to visible photos only
-        var imagePaths: [String] = []
+        // Gather image files from originals, filtering to visible photos only
+        var uuidToPath: [String: String] = [:]
         if let enumerator = fm.enumerator(atPath: directoryPath) {
             while let file = enumerator.nextObject() as? String {
                 let ext = (file as NSString).pathExtension.lowercased()
                 guard extensions.contains(ext) else { continue }
                 let name = ((file as NSString).lastPathComponent as NSString).deletingPathExtension
                 guard visibleUUIDs.contains(name) else { continue }
-                imagePaths.append((directoryPath as NSString).appendingPathComponent(file))
+                uuidToPath[name] = (directoryPath as NSString).appendingPathComponent(file)
+            }
+        }
+
+        // Fill in missing photos from derivatives (locally cached iCloud photos)
+        let home = fm.homeDirectoryForCurrentUser.path
+        let derivativesPath = "\(home)/Pictures/Photos Library.photoslibrary/resources/derivatives"
+        let missingUUIDs = visibleUUIDs.subtracting(uuidToPath.keys)
+        if !missingUUIDs.isEmpty, let enumerator = fm.enumerator(atPath: derivativesPath) {
+            while let file = enumerator.nextObject() as? String {
+                let ext = (file as NSString).pathExtension.lowercased()
+                guard extensions.contains(ext) else { continue }
+                let basename = ((file as NSString).lastPathComponent as NSString).deletingPathExtension
+                // Derivative filenames: UUID_1_105_c — extract UUID before first underscore
+                guard let underscoreIdx = basename.firstIndex(of: "_") else { continue }
+                let uuid = String(basename[..<underscoreIdx])
+                guard missingUUIDs.contains(uuid), uuidToPath[uuid] == nil else { continue }
+                let fullPath = (derivativesPath as NSString).appendingPathComponent(file)
+                // Prefer larger files (better quality)
+                if let existing = uuidToPath[uuid],
+                   let existingSize = try? fm.attributesOfItem(atPath: existing)[.size] as? Int,
+                   let newSize = try? fm.attributesOfItem(atPath: fullPath)[.size] as? Int,
+                   newSize <= existingSize { continue }
+                uuidToPath[uuid] = fullPath
             }
         }
 
         // Bulk check already-indexed (single actor hop instead of N)
         let indexedUUIDs = await store.indexedUUIDs()
-        let toIndex: [(path: String, uuid: String)] = imagePaths.compactMap { path in
-            let filename = (path as NSString).lastPathComponent
-            let uuid = (filename as NSString).deletingPathExtension
+        let toIndex: [(path: String, uuid: String)] = uuidToPath.compactMap { uuid, path in
             guard !indexedUUIDs.contains(uuid) else { return nil }
             return (path, uuid)
         }
