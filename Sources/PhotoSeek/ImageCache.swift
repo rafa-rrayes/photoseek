@@ -37,7 +37,7 @@ actor ImageCache {
     }
 
     /// Prepare an image for embedding: resize to max 768px and convert to JPEG.
-    func prepareForEmbedding(at path: String) -> Data? {
+    nonisolated func prepareForEmbedding(at path: String) -> Data? {
         let url = URL(fileURLWithPath: path) as CFURL
         guard let source = CGImageSourceCreateWithURL(url, nil) else { return nil }
 

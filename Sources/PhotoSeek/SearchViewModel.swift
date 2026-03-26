@@ -182,7 +182,10 @@ final class SearchViewModel {
     private func indexSinglePhoto(path: String, uuid: String, apiKey: String) async {
         let fm = FileManager.default
 
-        guard let jpegData = await ImageCache.shared.prepareForEmbedding(at: path) else {
+        let prepTask = Task.detached(priority: .userInitiated) {
+            ImageCache.shared.prepareForEmbedding(at: path)
+        }
+        guard let jpegData = await prepTask.value else {
             indexingDone += 1
             return
         }
