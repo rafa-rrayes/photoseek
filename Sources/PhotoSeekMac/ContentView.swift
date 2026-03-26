@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotoSeekCore
 
 struct ContentView: View {
     @Bindable var viewModel: SearchViewModel
@@ -43,8 +44,8 @@ struct ContentView: View {
                     Divider()
                     ActionBar(
                         selectedCount: viewModel.selectedCount,
-                        onFavorite: { viewModel.favoriteSelected() },
-                        onUnfavorite: { viewModel.unfavoriteSelected() },
+                        onFavorite: { Task { await viewModel.favoriteSelected() } },
+                        onUnfavorite: { Task { await viewModel.unfavoriteSelected() } },
                         onAddToAlbum: { showAlbumPicker = true },
                         onNewAlbum: { showAlbumPicker = true },
                         onDelete: { viewModel.confirmDelete() },
@@ -67,7 +68,7 @@ struct ContentView: View {
         }
         .alert("Delete \(viewModel.selectedCount) photo\(viewModel.selectedCount == 1 ? "" : "s")?",
                isPresented: $viewModel.showDeleteConfirmation) {
-            Button("Delete", role: .destructive) { viewModel.deleteSelected() }
+            Button("Delete", role: .destructive) { Task { await viewModel.deleteSelected() } }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will move \(viewModel.selectedCount == 1 ? "this photo" : "these photos") to Recently Deleted in Photos.")
@@ -75,8 +76,8 @@ struct ContentView: View {
         .sheet(isPresented: $showAlbumPicker) {
             AlbumPickerSheet(
                 albums: PhotosActions.fetchAlbumNames(),
-                onSelect: { viewModel.addSelectedToAlbum($0) },
-                onCreateNew: { viewModel.createAlbumWithSelected($0) }
+                onSelect: { name in Task { await viewModel.addSelectedToAlbum(name) } },
+                onCreateNew: { name in Task { await viewModel.createAlbumWithSelected(name) } }
             )
             .background(.ultraThinMaterial)
             .preferredColorScheme(.dark)

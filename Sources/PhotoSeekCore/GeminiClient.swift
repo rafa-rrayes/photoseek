@@ -1,15 +1,15 @@
 import Foundation
 
-actor GeminiClient {
+public actor GeminiClient {
     private let session: URLSession
 
-    init() {
+    public init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         self.session = URLSession(configuration: config)
     }
 
-    func embedText(_ text: String, apiKey: String) async throws -> [Float] {
+    public func embedText(_ text: String, apiKey: String) async throws -> [Float] {
         let body: [String: Any] = [
             "content": ["parts": [["text": text]]],
             "taskType": "RETRIEVAL_QUERY",
@@ -18,7 +18,7 @@ actor GeminiClient {
         return try await callEmbed(body: body, apiKey: apiKey)
     }
 
-    func embedImage(_ jpegData: Data, apiKey: String) async throws -> [Float] {
+    public func embedImage(_ jpegData: Data, apiKey: String) async throws -> [Float] {
         let body: [String: Any] = [
             "content": ["parts": [
                 ["inline_data": [
@@ -68,15 +68,15 @@ actor GeminiClient {
         return result.embedding.values
     }
 
-    struct EmbedResponse: Codable {
-        let embedding: EmbeddingValues
+    public struct EmbedResponse: Codable, Sendable {
+        public let embedding: EmbeddingValues
     }
 
-    struct EmbeddingValues: Codable {
-        let values: [Float]
+    public struct EmbeddingValues: Codable, Sendable {
+        public let values: [Float]
     }
 
-    enum GeminiError: LocalizedError, Equatable {
+    public enum GeminiError: LocalizedError, Equatable, Sendable {
         case invalidKey
         case rateLimited
         case networkTimeout
@@ -84,7 +84,7 @@ actor GeminiClient {
         case serverError
         case unknown(Int)
 
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
             case .invalidKey:
                 return "Invalid API key. Check your key in Settings."

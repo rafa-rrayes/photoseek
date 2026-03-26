@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import PhotoSeekCore
 
 class FloatingPanel: NSPanel {
     init(contentRect: NSRect) {

@@ -6,33 +6,33 @@ BUNDLE_DIR="build/${APP_NAME}.app"
 CONTENTS_DIR="${BUNDLE_DIR}/Contents"
 MACOS_DIR="${CONTENTS_DIR}/MacOS"
 RESOURCES_DIR="${CONTENTS_DIR}/Resources"
-ENTITLEMENTS="Sources/${APP_NAME}/Resources/PhotoSeek.entitlements"
+ENTITLEMENTS="Sources/PhotoSeekMac/Resources/PhotoSeek.entitlements"
 
-echo "Building ${APP_NAME} (release)..."
-swift build -c release
+echo "Building ${APP_NAME} macOS (release)..."
+swift build -c release --target PhotoSeekMac
 
 echo "Creating app bundle..."
 rm -rf "${BUNDLE_DIR}"
 mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
 
 # Copy binary
-cp ".build/release/${APP_NAME}" "${MACOS_DIR}/${APP_NAME}"
+cp ".build/release/PhotoSeekMac" "${MACOS_DIR}/${APP_NAME}"
 
 # Copy Info.plist
-cp "Sources/${APP_NAME}/Resources/Info.plist" "${CONTENTS_DIR}/Info.plist"
+cp "Sources/PhotoSeekMac/Resources/Info.plist" "${CONTENTS_DIR}/Info.plist"
 
 # Copy app icon if it exists
-if [ -f "Sources/${APP_NAME}/Resources/AppIcon.icns" ]; then
-    cp "Sources/${APP_NAME}/Resources/AppIcon.icns" "${RESOURCES_DIR}/AppIcon.icns"
+if [ -f "Sources/PhotoSeekMac/Resources/AppIcon.icns" ]; then
+    cp "Sources/PhotoSeekMac/Resources/AppIcon.icns" "${RESOURCES_DIR}/AppIcon.icns"
 fi
 
 # Copy menu bar icons into the SwiftPM resource bundle
-BUNDLE_RES="${RESOURCES_DIR}/PhotoSeek_PhotoSeek.bundle"
+BUNDLE_RES="${RESOURCES_DIR}/PhotoSeekMac_PhotoSeekMac.bundle"
 mkdir -p "${BUNDLE_RES}"
-cp "Sources/${APP_NAME}/Resources/MenuBarIcon.png" "${BUNDLE_RES}/"
-cp "Sources/${APP_NAME}/Resources/MenuBarIcon@2x.png" "${BUNDLE_RES}/"
+cp "Sources/PhotoSeekMac/Resources/MenuBarIcon.png" "${BUNDLE_RES}/"
+cp "Sources/PhotoSeekMac/Resources/MenuBarIcon@2x.png" "${BUNDLE_RES}/"
 
-echo "✓ Built: ${BUNDLE_DIR}"
+echo "Done: ${BUNDLE_DIR}"
 
 # --- Code Signing ---
 SIGNING_IDENTITY="${SIGNING_IDENTITY:-}"
@@ -47,9 +47,9 @@ if [ -n "$SIGNING_IDENTITY" ]; then
         --sign "$SIGNING_IDENTITY" \
         --entitlements "$ENTITLEMENTS" \
         "${BUNDLE_DIR}"
-    echo "✓ Signed"
+    echo "Signed"
 else
-    echo "⚠ No signing identity found — app will trigger Gatekeeper warnings."
+    echo "No signing identity found — app will trigger Gatekeeper warnings."
     echo "  Users will need to right-click > Open on first launch."
     echo "  To sign: export SIGNING_IDENTITY='Developer ID Application: ...'"
 fi
@@ -85,11 +85,11 @@ if [ -n "$SIGNING_IDENTITY" ] && [ -n "$APPLE_ID" ] && [ -n "$TEAM_ID" ]; then
         --keychain-profile "notarize-profile" \
         --wait
     xcrun stapler staple "${DMG_PATH}"
-    echo "✓ Notarized"
+    echo "Notarized"
 elif [ -n "$SIGNING_IDENTITY" ]; then
     echo "Skipping notarization (set APPLE_ID and TEAM_ID to enable)"
 fi
 
 echo ""
-echo "✓ DMG ready: ${DMG_PATH}"
+echo "DMG ready: ${DMG_PATH}"
 echo "  Distribute this file — users open it and drag ${APP_NAME} to Applications."

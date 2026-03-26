@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotoSeekCore
 
 struct SettingsView: View {
     @Bindable var viewModel: SearchViewModel
@@ -6,7 +7,7 @@ struct SettingsView: View {
     @State private var showApiKey = false
     @State private var showRemoveKeyAlert = false
     @State private var showClearIndexAlert = false
-    @State private var libraryStats: SearchViewModel.LibraryStats?
+    @State private var libraryStats: LibraryStats?
     @State private var isScanningStats = false
 
     private var settings: SettingsManager { SettingsManager.shared }

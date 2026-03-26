@@ -1,11 +1,13 @@
 import Foundation
 import Security
+#if os(macOS)
 import ServiceManagement
+#endif
 
 @MainActor
 @Observable
-final class SettingsManager {
-    static let shared = SettingsManager()
+public final class SettingsManager {
+    public static let shared = SettingsManager()
 
     private static let apiKeyFile = "api-key"
     private static let legacyDefaultsKey = "gemini_api_key"
@@ -13,40 +15,43 @@ final class SettingsManager {
 
     // MARK: - API Key (file-backed, 0600 permissions)
 
-    var apiKey: String {
+    public var apiKey: String {
         didSet { SecureStorage.save(key: Self.apiKeyFile, value: apiKey) }
     }
 
-    var hasApiKey: Bool { !apiKey.trimmingCharacters(in: .whitespaces).isEmpty }
+    public var hasApiKey: Bool { !apiKey.trimmingCharacters(in: .whitespaces).isEmpty }
 
-    func removeApiKey() {
+    public func removeApiKey() {
         apiKey = ""
         SecureStorage.delete(key: Self.apiKeyFile)
     }
 
-    // MARK: - Index Folders (UserDefaults-backed)
+    // MARK: - Index Folders (macOS only, UserDefaults-backed)
 
-    var indexFolders: [String] {
+    #if os(macOS)
+    public var indexFolders: [String] {
         didSet { UserDefaults.standard.set(indexFolders, forKey: "index_folders") }
     }
+    #endif
 
     // MARK: - Last Indexed Date
 
-    var lastIndexedDate: Date? {
+    public var lastIndexedDate: Date? {
         didSet { UserDefaults.standard.set(lastIndexedDate?.timeIntervalSince1970, forKey: "last_indexed_date") }
     }
 
     // MARK: - Display
 
-    var showSimilarityPercent: Bool {
+    public var showSimilarityPercent: Bool {
         didSet { UserDefaults.standard.set(showSimilarityPercent, forKey: "show_similarity_percent") }
     }
 
-    // MARK: - Launch at Login
+    // MARK: - Launch at Login (macOS only)
 
+    #if os(macOS)
     private var _isUpdatingLaunchAtLogin = false
 
-    var launchAtLogin: Bool = false {
+    public var launchAtLogin: Bool = false {
         didSet {
             guard !_isUpdatingLaunchAtLogin else { return }
             _isUpdatingLaunchAtLogin = true
@@ -65,10 +70,11 @@ final class SettingsManager {
             }
         }
     }
+    #endif
 
     // MARK: - Database Path
 
-    var databasePath: String {
+    public var databasePath: String {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupport.appendingPathComponent("PhotoSeek/photoseek.db").path
     }
@@ -95,19 +101,21 @@ final class SettingsManager {
         // Display
         self.showSimilarityPercent = defaults.bool(forKey: "show_similarity_percent")
 
+        // Last indexed date
+        let ts = defaults.double(forKey: "last_indexed_date")
+        self.lastIndexedDate = ts > 0 ? Date(timeIntervalSince1970: ts) : nil
+
+        #if os(macOS)
         // Index folders
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let defaultFolder = "\(home)/Pictures/Photos Library.photoslibrary/originals"
         self.indexFolders = (defaults.stringArray(forKey: "index_folders")) ?? [defaultFolder]
 
-        // Last indexed date
-        let ts = defaults.double(forKey: "last_indexed_date")
-        self.lastIndexedDate = ts > 0 ? Date(timeIntervalSince1970: ts) : nil
-
         // Launch at login: read current state
         if #available(macOS 13.0, *) {
             self.launchAtLogin = SMAppService.mainApp.status == .enabled
         }
+        #endif
     }
 
     // MARK: - Migration

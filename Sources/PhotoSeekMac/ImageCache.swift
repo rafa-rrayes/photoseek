@@ -1,5 +1,6 @@
 import AppKit
 import ImageIO
+import PhotoSeekCore
 
 actor ImageCache {
     static let shared = ImageCache()
@@ -38,27 +39,7 @@ actor ImageCache {
 
     /// Prepare an image for embedding: resize to max 768px and convert to JPEG.
     nonisolated func prepareForEmbedding(at path: String) -> Data? {
-        let url = URL(fileURLWithPath: path) as CFURL
-        guard let source = CGImageSourceCreateWithURL(url, nil) else { return nil }
-
-        let options: [CFString: Any] = [
-            kCGImageSourceThumbnailMaxPixelSize: 768,
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-        ]
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-            return nil
-        }
-
-        let mutableData = NSMutableData()
-        guard let dest = CGImageDestinationCreateWithData(mutableData, "public.jpeg" as CFString, 1, nil) else {
-            return nil
-        }
-        let jpegOpts: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: 0.85]
-        CGImageDestinationAddImage(dest, cgImage, jpegOpts as CFDictionary)
-        guard CGImageDestinationFinalize(dest) else { return nil }
-
-        return mutableData as Data
+        EmbeddingPreparer.prepareFromFile(at: path)
     }
 
 }

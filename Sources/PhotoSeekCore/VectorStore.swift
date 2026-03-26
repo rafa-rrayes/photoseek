@@ -4,35 +4,37 @@ import Accelerate
 
 private let SQLITE_TRANSIENT_PTR = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-actor VectorStore {
+public actor VectorStore {
     private var db: OpaquePointer?
     private var photos: [StoredPhoto] = []
     private var uuidSet: Set<String> = []
 
-    struct StoredPhoto {
-        let uuid: String
-        let filename: String
-        let date: String
-        let path: String
-        let derivative: String
-        let title: String
-        let albums: [String]
-        let persons: [String]
-        let embedding: [Float]
-        let magnitude: Float
+    public struct StoredPhoto: Sendable {
+        public let uuid: String
+        public let filename: String
+        public let date: String
+        public let path: String
+        public let derivative: String
+        public let title: String
+        public let albums: [String]
+        public let persons: [String]
+        public let embedding: [Float]
+        public let magnitude: Float
     }
 
-    var count: Int { photos.count }
+    public var count: Int { photos.count }
 
-    func contains(uuid: String) -> Bool {
+    public init() {}
+
+    public func contains(uuid: String) -> Bool {
         uuidSet.contains(uuid)
     }
 
-    func indexedUUIDs() -> Set<String> {
+    public func indexedUUIDs() -> Set<String> {
         uuidSet
     }
 
-    func open(at path: String) throws {
+    public func open(at path: String) throws {
         let dir = (path as NSString).deletingLastPathComponent
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
 
@@ -43,7 +45,7 @@ actor VectorStore {
         try createTable()
     }
 
-    func loadAll() throws {
+    public func loadAll() throws {
         guard let db else { throw StoreError.notOpen }
 
         var stmt: OpaquePointer?
@@ -93,7 +95,7 @@ actor VectorStore {
         self.uuidSet = ids
     }
 
-    func search(queryEmbedding: [Float], limit: Int = 20) -> [SearchResult] {
+    public func search(queryEmbedding: [Float], limit: Int = 20) -> [SearchResult] {
         guard !photos.isEmpty else { return [] }
 
         var queryMag: Float = 0
@@ -131,7 +133,7 @@ actor VectorStore {
         }
     }
 
-    func addPhoto(uuid: String, filename: String, date: String, path: String,
+    public func addPhoto(uuid: String, filename: String, date: String, path: String,
                   title: String, albums: [String], persons: [String],
                   embedding: [Float]) throws {
         guard let db else { throw StoreError.notOpen }
@@ -177,7 +179,7 @@ actor VectorStore {
         uuidSet.insert(uuid)
     }
 
-    func clearAll() throws {
+    public func clearAll() throws {
         guard let db else { throw StoreError.notOpen }
         guard sqlite3_exec(db, "DELETE FROM photos", nil, nil, nil) == SQLITE_OK else {
             throw StoreError.queryFailed(String(cString: sqlite3_errmsg(db)))
@@ -186,7 +188,7 @@ actor VectorStore {
         uuidSet.removeAll()
     }
 
-    func close() {
+    public func close() {
         if let db {
             sqlite3_close(db)
             self.db = nil
@@ -249,12 +251,12 @@ actor VectorStore {
         return str
     }
 
-    enum StoreError: LocalizedError {
+    public enum StoreError: LocalizedError {
         case cannotOpen(String)
         case notOpen
         case queryFailed(String)
 
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
             case .cannotOpen(let p): return "Cannot open database at \(p)"
             case .notOpen: return "Database not open"

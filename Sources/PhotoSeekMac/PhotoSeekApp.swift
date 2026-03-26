@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import PhotoSeekCore
 
 @main
 struct PhotoSeekApp: App {
@@ -41,8 +42,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
 
         viewModel = SearchViewModel(store: store)
+        viewModel.photoActions = MacPhotoActionsAdapter()
         panelController = PanelController(viewModel: viewModel)
-
     }
 
     func applicationWillTerminate(_ notification: Notification) {

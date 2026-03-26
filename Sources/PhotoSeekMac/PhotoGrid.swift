@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotoSeekCore
 
 struct PhotoGrid: View {
     let results: [SearchResult]

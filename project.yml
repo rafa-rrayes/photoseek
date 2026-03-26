@@ -1,0 +1,33 @@
+name: PhotoSeekiOS
+options:
+  bundleIdPrefix: com.rafa.photoseek
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: false
+
+packages:
+  PhotoSeek:
+    path: .
+
+targets:
+  PhotoSeekiOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/PhotoSeekiOS
+        excludes:
+          - "Resources/**"
+    info:
+      path: Sources/PhotoSeekiOS/Resources/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.rafa.photoseek.ios
+        SWIFT_VERSION: "5"
+        CODE_SIGN_STYLE: Automatic
+        INFOPLIST_FILE: Sources/PhotoSeekiOS/Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: false
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: ""
+    dependencies:
+      - package: PhotoSeek
+        product: PhotoSeekCore
