@@ -36,6 +36,16 @@ struct PhotoCell: View {
             .frame(width: 7, height: 7)
     }
 
+    private var isVideo: Bool { result.mediaType == .video }
+
+    private var durationLabel: String? {
+        guard let seconds = result.durationSeconds, seconds.isFinite, seconds > 0 else { return nil }
+        let total = Int(seconds.rounded())
+        let mins = total / 60
+        let secs = total % 60
+        return String(format: "%d:%02d", mins, secs)
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             if let image {
@@ -54,10 +64,18 @@ struct PhotoCell: View {
             }
 
             if image != nil {
-                VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .bottom) {
                     scoreIndicator
+                    Spacer()
+                    if let durationLabel {
+                        Text(durationLabel)
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 4))
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .background(
@@ -69,7 +87,6 @@ struct PhotoCell: View {
                 )
             }
 
-            // Selection checkmark (only in select mode)
             if isSelectMode {
                 ZStack {
                     if isSelected {
@@ -108,23 +125,42 @@ struct PhotoCell: View {
         .onTapGesture {
             if isSelectMode {
                 onSelect?()
+            } else if isVideo, !result.path.isEmpty {
+                NSWorkspace.shared.open(URL(fileURLWithPath: result.path))
             } else {
                 PhotosActions.openInPhotos(result.uuid)
             }
         }
         .help(result.filename)
         .task(id: result.uuid) {
-            let loadPath = !result.derivative.isEmpty ? result.derivative : result.path
-            image = await ImageCache.shared.image(for: loadPath)
+            if isVideo, !result.path.isEmpty {
+                image = await ImageCache.shared.videoThumbnail(for: result.path)
+            } else {
+                let loadPath = !result.derivative.isEmpty ? result.derivative : result.path
+                image = await ImageCache.shared.image(for: loadPath)
+            }
         }
         .contextMenu {
-            Button("Open in Photos") { PhotosActions.openInPhotos(result.uuid) }
-            if FileManager.default.fileExists(atPath: result.path) {
-                Button("Open in Preview") {
-                    NSWorkspace.shared.open(URL(fileURLWithPath: result.path))
+            if isVideo {
+                Button("Play Video") {
+                    if !result.path.isEmpty {
+                        NSWorkspace.shared.open(URL(fileURLWithPath: result.path))
+                    }
                 }
-                Button("Show in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: result.path)])
+                if FileManager.default.fileExists(atPath: result.path) {
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: result.path)])
+                    }
+                }
+            } else {
+                Button("Open in Photos") { PhotosActions.openInPhotos(result.uuid) }
+                if FileManager.default.fileExists(atPath: result.path) {
+                    Button("Open in Preview") {
+                        NSWorkspace.shared.open(URL(fileURLWithPath: result.path))
+                    }
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: result.path)])
+                    }
                 }
             }
         }

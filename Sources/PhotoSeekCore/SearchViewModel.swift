@@ -1,14 +1,37 @@
 import Foundation
+import AVFoundation
 #if os(macOS)
 import AppKit
 import SQLite3
+import Photos
 #endif
+
+public enum MediaTypeFilter: String, Sendable, CaseIterable {
+    case all
+    case photos
+    case videos
+
+    var storeFilter: MediaType? {
+        switch self {
+        case .all: return nil
+        case .photos: return .photo
+        case .videos: return .video
+        }
+    }
+}
 
 @MainActor
 @Observable
 public final class SearchViewModel {
     public var query: String = "" {
         didSet { debounceSearch() }
+    }
+
+    public var mediaTypeFilter: MediaTypeFilter = .all {
+        didSet {
+            guard mediaTypeFilter != oldValue else { return }
+            refilter()
+        }
     }
 
     public var results: [SearchResult] = []
@@ -88,7 +111,11 @@ public final class SearchViewModel {
                 let embedding = try await gemini.embedText(trimmed, apiKey: apiKey)
                 guard !Task.isCancelled else { return }
                 self.lastEmbedding = embedding
-                let searchResults = await store.search(queryEmbedding: embedding, limit: pageSize)
+                let searchResults = await store.search(
+                    queryEmbedding: embedding,
+                    limit: pageSize,
+                    mediaType: mediaTypeFilter.storeFilter
+                )
                 guard !Task.isCancelled else { return }
                 self.results = searchResults
                 self.hasMore = searchResults.count == pageSize
@@ -107,11 +134,28 @@ public final class SearchViewModel {
         guard !isLoadingMore, hasMore, let embedding = lastEmbedding else { return }
         isLoadingMore = true
         let nextPage = results.count + pageSize
-        let moreResults = await store.search(queryEmbedding: embedding, limit: nextPage)
+        let moreResults = await store.search(
+            queryEmbedding: embedding,
+            limit: nextPage,
+            mediaType: mediaTypeFilter.storeFilter
+        )
         let newItems = Array(moreResults.dropFirst(results.count))
         hasMore = !newItems.isEmpty
         results.append(contentsOf: newItems)
         isLoadingMore = false
+    }
+
+    private func refilter() {
+        guard let embedding = lastEmbedding else { return }
+        Task {
+            let searchResults = await store.search(
+                queryEmbedding: embedding,
+                limit: pageSize,
+                mediaType: mediaTypeFilter.storeFilter
+            )
+            self.results = searchResults
+            self.hasMore = searchResults.count == pageSize
+        }
     }
 
     // MARK: - Indexing (provider-based)
@@ -127,7 +171,7 @@ public final class SearchViewModel {
         indexingDone = 0
         errorMessage = nil
 
-        let indexedUUIDs = await store.indexedUUIDs()
+        let indexedUUIDs = await store.indexedPhotoUUIDs()
         let toIndex = await provider.photosToIndex(excluding: indexedUUIDs)
 
         indexingTotal = toIndex.count
@@ -194,8 +238,141 @@ public final class SearchViewModel {
             } catch let error as GeminiClient.GeminiError where error == .rateLimited {
                 attempt += 1
                 try? await Task.sleep(for: .seconds(Double(attempt) * 2))
-            } catch {
+            } catch let error as GeminiClient.GeminiError where error == .invalidKey {
                 errorMessage = error.localizedDescription
+                isIndexing = false
+                indexingDone += 1
+                return
+            } catch {
+                indexingDone += 1
+                return
+            }
+        }
+        indexingDone += 1
+    }
+
+    public func indexVideos() async {
+        guard SettingsManager.shared.indexVideosEnabled else { return }
+        guard let provider = photoProvider else { return }
+        guard SettingsManager.shared.hasApiKey else {
+            errorMessage = "Set your Gemini API key first"
+            return
+        }
+
+        isIndexing = true
+        indexingDone = 0
+        errorMessage = nil
+
+        let indexedUUIDs = await store.indexedVideoUUIDs()
+        let toIndex = await provider.videosToIndex(excluding: indexedUUIDs)
+
+        indexingTotal = toIndex.count
+        if toIndex.isEmpty {
+            isIndexing = false
+            return
+        }
+
+        let apiKey = SettingsManager.shared.apiKey
+        let concurrency = 6
+
+        await withTaskGroup(of: Void.self) { group in
+            var iter = toIndex.makeIterator()
+
+            for _ in 0..<concurrency {
+                guard let item = iter.next() else { break }
+                group.addTask { await self.indexSingleVideo(item, apiKey: apiKey) }
+            }
+
+            for await _ in group {
+                guard self.isIndexing else {
+                    group.cancelAll()
+                    break
+                }
+                if let item = iter.next() {
+                    group.addTask { await self.indexSingleVideo(item, apiKey: apiKey) }
+                }
+            }
+        }
+
+        isIndexing = false
+        SettingsManager.shared.lastIndexedDate = Date()
+    }
+
+    private func indexSingleVideo(_ video: VideoInfo, apiKey: String) async {
+        guard let provider = photoProvider else {
+            indexingDone += 1
+            return
+        }
+
+        guard let bytes = await provider.videoBytesForEmbedding(video) else {
+            indexingDone += 1
+            return
+        }
+
+        await embedAndStoreVideo(
+            uuid: video.uuid,
+            filename: video.filename,
+            date: video.date,
+            path: video.path,
+            durationSeconds: video.durationSeconds,
+            bytes: bytes,
+            apiKey: apiKey
+        )
+    }
+
+    private func embedAndStoreVideo(uuid: String, filename: String, date: String, path: String,
+                                    durationSeconds: Double, bytes: VideoBytes, apiKey: String) async {
+        let inlineThreshold = 20 * 1024 * 1024 // 20 MB
+
+        var attempt = 0
+        while attempt < 3 {
+            do {
+                let embedding: [Float]
+                if bytes.data.count < inlineThreshold {
+                    embedding = try await gemini.embedVideo(bytes.data, mimeType: bytes.mimeType, apiKey: apiKey)
+                } else {
+                    let uploaded = try await gemini.uploadFile(
+                        bytes.data,
+                        mimeType: bytes.mimeType,
+                        displayName: filename.isEmpty ? uuid : filename,
+                        apiKey: apiKey
+                    )
+                    do {
+                        embedding = try await gemini.embedVideoByFileUri(
+                            uploaded.uri,
+                            mimeType: bytes.mimeType,
+                            apiKey: apiKey
+                        )
+                    } catch {
+                        await gemini.deleteFile(name: uploaded.name, apiKey: apiKey)
+                        throw error
+                    }
+                    await gemini.deleteFile(name: uploaded.name, apiKey: apiKey)
+                }
+
+                try await store.addVideo(
+                    uuid: uuid,
+                    filename: filename,
+                    date: date,
+                    path: path,
+                    title: "",
+                    albums: [],
+                    persons: [],
+                    durationSeconds: durationSeconds,
+                    embedding: embedding
+                )
+                indexingDone += 1
+                indexedCount = await store.count
+                return
+            } catch let error as GeminiClient.GeminiError where error == .rateLimited {
+                attempt += 1
+                try? await Task.sleep(for: .seconds(Double(attempt) * 2))
+            } catch let error as GeminiClient.GeminiError where error == .invalidKey {
+                errorMessage = error.localizedDescription
+                isIndexing = false
+                indexingDone += 1
+                return
+            } catch {
                 indexingDone += 1
                 return
             }
@@ -208,11 +385,13 @@ public final class SearchViewModel {
     }
 
     #if os(macOS)
-    public func indexAllFolders() async {
+    public func indexAllFolders(includeVideos: Bool, includeICloud: Bool) async {
         let folders = SettingsManager.shared.indexFolders
         for folder in folders {
-            guard isIndexing || !isIndexing else { break }
             await indexPhotosFromDirectory(folder)
+        }
+        if includeVideos {
+            await indexVideosViaPhotoKit(allowICloud: includeICloud)
         }
         SettingsManager.shared.lastIndexedDate = Date()
     }
@@ -264,7 +443,7 @@ public final class SearchViewModel {
             }
         }
 
-        let indexedUUIDs = await store.indexedUUIDs()
+        let indexedUUIDs = await store.indexedPhotoUUIDs()
         let toIndex: [(path: String, uuid: String)] = uuidToPath.compactMap { uuid, path in
             guard !indexedUUIDs.contains(uuid) else { return nil }
             return (path, uuid)
@@ -336,13 +515,125 @@ public final class SearchViewModel {
             } catch let error as GeminiClient.GeminiError where error == .rateLimited {
                 attempt += 1
                 try? await Task.sleep(for: .seconds(Double(attempt) * 2))
-            } catch {
+            } catch let error as GeminiClient.GeminiError where error == .invalidKey {
                 errorMessage = error.localizedDescription
+                isIndexing = false
+                indexingDone += 1
+                return
+            } catch {
                 indexingDone += 1
                 return
             }
         }
         indexingDone += 1
+    }
+
+    /// macOS video indexing via PhotoKit. PhotoKit handles iCloud-optimized
+    /// libraries — when allowICloud is true, originals are downloaded on demand
+    /// via isNetworkAccessAllowed; when false, iCloud-only videos are skipped.
+    public func indexVideosViaPhotoKit(allowICloud: Bool) async {
+        guard SettingsManager.shared.hasApiKey else {
+            errorMessage = "Set your Gemini API key first"
+            return
+        }
+
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        let authorized: Bool
+        if status == .authorized || status == .limited {
+            authorized = true
+        } else if status == .notDetermined {
+            let new = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            authorized = (new == .authorized || new == .limited)
+        } else {
+            authorized = false
+        }
+        guard authorized else {
+            errorMessage = "Photo library access required to index videos. Grant access in System Settings → Privacy & Security → Photos."
+            return
+        }
+
+        let options = PHFetchOptions()
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        options.includeHiddenAssets = false
+
+        let fetchResult = PHAsset.fetchAssets(with: .video, options: options)
+        let indexedUUIDs = await store.indexedVideoUUIDs()
+
+        var toIndex: [PHAsset] = []
+        fetchResult.enumerateObjects { asset, _, _ in
+            guard !indexedUUIDs.contains(asset.localIdentifier) else { return }
+            toIndex.append(asset)
+        }
+
+        if toIndex.isEmpty { return }
+
+        isIndexing = true
+        indexingDone = 0
+        indexingTotal = toIndex.count
+
+        let apiKey = SettingsManager.shared.apiKey
+        let concurrency = 6
+
+        await withTaskGroup(of: Void.self) { group in
+            var iter = toIndex.makeIterator()
+
+            for _ in 0..<concurrency {
+                guard let asset = iter.next() else { break }
+                group.addTask { await self.indexSingleVideoFromAsset(asset, allowICloud: allowICloud, apiKey: apiKey) }
+            }
+
+            for await _ in group {
+                guard self.isIndexing else {
+                    group.cancelAll()
+                    break
+                }
+                if let asset = iter.next() {
+                    group.addTask { await self.indexSingleVideoFromAsset(asset, allowICloud: allowICloud, apiKey: apiKey) }
+                }
+            }
+        }
+
+        isIndexing = false
+    }
+
+    private func indexSingleVideoFromAsset(_ asset: PHAsset, allowICloud: Bool, apiKey: String) async {
+        let options = PHVideoRequestOptions()
+        options.isNetworkAccessAllowed = allowICloud
+        options.version = .current
+        options.deliveryMode = .highQualityFormat
+
+        let avAsset: AVAsset? = await withCheckedContinuation { continuation in
+            var resumed = false
+            PHImageManager.default().requestAVAsset(forVideo: asset, options: options) { avAsset, _, _ in
+                guard !resumed else { return }
+                resumed = true
+                continuation.resume(returning: avAsset)
+            }
+        }
+
+        guard let urlAsset = avAsset as? AVURLAsset else {
+            indexingDone += 1
+            return
+        }
+
+        guard let prepared = await EmbeddingPreparer.prepareVideoSlice(from: urlAsset.url) else {
+            indexingDone += 1
+            return
+        }
+
+        let filename = PHAssetResource.assetResources(for: asset).first?.originalFilename ?? ""
+        let date = asset.creationDate?.ISO8601Format() ?? ""
+        let videoBytes = VideoBytes(data: prepared.data, mimeType: prepared.mimeType)
+
+        await embedAndStoreVideo(
+            uuid: asset.localIdentifier,
+            filename: filename,
+            date: date,
+            path: urlAsset.url.path,
+            durationSeconds: asset.duration,
+            bytes: videoBytes,
+            apiKey: apiKey
+        )
     }
 
     public func scanLibraryStats() async -> LibraryStats {
@@ -367,6 +658,23 @@ public final class SearchViewModel {
             AND ZCLOUDLOCALSTATE = 1
             """)
 
+        stats.totalVideos = queryCount(db, """
+            SELECT COUNT(*) FROM ZASSET
+            WHERE ZKIND = 1 AND ZTRASHEDSTATE = 0 AND ZHIDDEN = 0 AND ZVISIBILITYSTATE = 0
+            """)
+
+        // Videos have no usable derivative for embedding — only the original counts as local.
+        // ZINTERNALRESOURCE.ZDATASTORESUBTYPE=1 + ZLOCALAVAILABILITY=1 means the original is on disk.
+        stats.localAvailableVideos = queryCount(db, """
+            SELECT COUNT(DISTINCT ZASSET.ZUUID)
+            FROM ZASSET
+            JOIN ZINTERNALRESOURCE ON ZASSET.Z_PK = ZINTERNALRESOURCE.ZASSET
+            WHERE ZASSET.ZKIND = 1
+            AND ZASSET.ZTRASHEDSTATE = 0 AND ZASSET.ZHIDDEN = 0 AND ZASSET.ZVISIBILITYSTATE = 0
+            AND ZINTERNALRESOURCE.ZDATASTORESUBTYPE = 1
+            AND ZINTERNALRESOURCE.ZLOCALAVAILABILITY = 1
+            """)
+
         return stats
     }
 
@@ -379,6 +687,14 @@ public final class SearchViewModel {
     }
 
     private func loadVisiblePhotoUUIDs() -> Set<String> {
+        loadVisibleUUIDs(kind: 0)
+    }
+
+    private func loadVisibleVideoUUIDs() -> Set<String> {
+        loadVisibleUUIDs(kind: 1)
+    }
+
+    private func loadVisibleUUIDs(kind: Int) -> Set<String> {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let dbPath = "\(home)/Pictures/Photos Library.photoslibrary/database/Photos.sqlite"
 
@@ -390,7 +706,7 @@ public final class SearchViewModel {
 
         let sql = """
             SELECT ZUUID FROM ZASSET
-            WHERE ZKIND = 0 AND ZTRASHEDSTATE = 0 AND ZHIDDEN = 0 AND ZVISIBILITYSTATE = 0
+            WHERE ZKIND = \(kind) AND ZTRASHEDSTATE = 0 AND ZHIDDEN = 0 AND ZVISIBILITYSTATE = 0
             """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
@@ -411,9 +727,13 @@ public final class SearchViewModel {
             try await store.clearAll()
             indexedCount = 0
             #if os(macOS)
-            await indexAllFolders()
+            await indexAllFolders(
+                includeVideos: SettingsManager.shared.indexVideosEnabled,
+                includeICloud: SettingsManager.shared.indexIncludeICloud
+            )
             #else
             await indexPhotos()
+            await indexVideos()
             #endif
         } catch {
             errorMessage = error.localizedDescription

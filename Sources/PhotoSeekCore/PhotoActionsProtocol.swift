@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 public protocol PhotoActionsProtocol {
     func openPhoto(_ uuid: String)
+    func openVideo(_ uuid: String)
     func favorite(_ uuids: [String]) async -> String?
     func unfavorite(_ uuids: [String]) async -> String?
     func deletePhotos(_ uuids: [String]) async

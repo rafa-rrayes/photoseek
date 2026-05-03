@@ -36,6 +36,16 @@ struct iOSPhotoCell: View {
             .frame(width: 6, height: 6)
     }
 
+    private var isVideo: Bool { result.mediaType == .video }
+
+    private var durationLabel: String? {
+        guard let seconds = result.durationSeconds, seconds.isFinite, seconds > 0 else { return nil }
+        let total = Int(seconds.rounded())
+        let mins = total / 60
+        let secs = total % 60
+        return String(format: "%d:%02d", mins, secs)
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             if let image {
@@ -54,10 +64,18 @@ struct iOSPhotoCell: View {
             }
 
             if image != nil {
-                VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .bottom) {
                     scoreIndicator
+                    Spacer()
+                    if let durationLabel {
+                        Text(durationLabel)
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 3))
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 4)
                 .background(
@@ -69,7 +87,6 @@ struct iOSPhotoCell: View {
                 )
             }
 
-            // Selection checkmark
             if isSelectMode {
                 ZStack {
                     if isSelected {
@@ -109,7 +126,8 @@ struct iOSPhotoCell: View {
         }
         .contextMenu {
             Button { onOpen?() } label: {
-                Label("Open in Photos", systemImage: "photo")
+                Label(isVideo ? "Play Video" : "Open in Photos",
+                      systemImage: isVideo ? "play.rectangle" : "photo")
             }
             Button {
                 onSelect?()
@@ -118,11 +136,10 @@ struct iOSPhotoCell: View {
             }
         }
         .task(id: result.uuid) {
-            // Use localIdentifier (stored in uuid) to load thumbnail
             image = await iOSImageCache.shared.thumbnail(for: result.uuid)
         }
         .onDisappear {
-            image = nil // Free memory when scrolled away
+            image = nil
         }
     }
 }

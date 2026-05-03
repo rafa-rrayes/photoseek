@@ -7,28 +7,37 @@ struct SettingsView: View {
     @State private var showApiKey = false
     @State private var showRemoveKeyAlert = false
     @State private var showClearIndexAlert = false
+    @State private var showIndexingStartedAlert = false
     @State private var libraryStats: LibraryStats?
     @State private var isScanningStats = false
 
     private var settings: SettingsManager { SettingsManager.shared }
 var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-                apiKeySection
-                Divider()
-                indexFoldersSection
-                Divider()
-                libraryStatsSection
-                Divider()
-                indexingSection
-                Divider()
-                generalSection
-                Divider()
-                aboutSection
+        ZStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    header
+                    apiKeySection
+                    Divider()
+                    indexFoldersSection
+                    Divider()
+                    libraryStatsSection
+                    Divider()
+                    indexingSection
+                    Divider()
+                    generalSection
+                    Divider()
+                    aboutSection
+                }
+                .padding(20)
             }
-            .padding(20)
+
+            if showIndexingStartedAlert {
+                indexingStartedOverlay
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
         }
+        .animation(.easeOut(duration: 0.18), value: showIndexingStartedAlert)
         .frame(width: 460, height: 520)
         .alert("Remove API Key?", isPresented: $showRemoveKeyAlert) {
             Button("Remove", role: .destructive) { settings.removeApiKey() }
@@ -41,6 +50,52 @@ var body: some View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will remove all indexed photos from the database. You will need to re-index.")
+        }
+    }
+
+    private var indexingStartedOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+                .onTapGesture { showIndexingStartedAlert = false }
+
+            VStack(spacing: 14) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundStyle(.primary)
+
+                Text("Indexing started")
+                    .font(.system(size: 15, weight: .semibold))
+
+                Text("Press Esc to hide this window — indexing will continue in the background. Progress is shown in the menu bar.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button {
+                    showIndexingStartedAlert = false
+                    dismiss()
+                } label: {
+                    Text("Got it")
+                        .font(.system(size: 13, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .keyboardShortcut(.defaultAction)
+                .padding(.top, 4)
+            }
+            .padding(20)
+            .frame(width: 300)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(.white.opacity(0.08), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.4), radius: 20, y: 8)
         }
     }
 
@@ -178,17 +233,24 @@ var body: some View {
             if let stats = libraryStats {
                 HStack(spacing: 16) {
                     statBadge(label: "Total Photos", count: stats.totalPhotos, color: .blue)
-                    statBadge(label: "Local Available", count: stats.localAvailable, color: .green)
-                    statBadge(label: "iCloud Only", count: stats.iCloudOnly, color: .orange)
+                    statBadge(label: "Total Videos", count: stats.totalVideos, color: .purple)
+                    statBadge(label: "iCloud Only", count: stats.iCloudOnly + stats.iCloudOnlyVideos, color: .orange)
                 }
             }
 
             HStack(spacing: 4) {
-                if let stats = libraryStats, stats.totalPhotos > 0 {
-                    let pct = Int(round(Double(viewModel.indexedCount) / Double(stats.totalPhotos) * 100))
-                    Text("\(formatNumber(viewModel.indexedCount)) indexed (\(pct)%)")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                if let stats = libraryStats {
+                    let total = stats.totalPhotos + stats.totalVideos
+                    if total > 0 {
+                        let pct = Int(round(Double(viewModel.indexedCount) / Double(total) * 100))
+                        Text("\(formatNumber(viewModel.indexedCount)) indexed (\(pct)%)")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("\(formatNumber(viewModel.indexedCount)) indexed")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
                     Text("\(formatNumber(viewModel.indexedCount)) indexed")
                         .font(.system(size: 11))
@@ -245,27 +307,46 @@ var body: some View {
                     }
                 }
             } else {
-                HStack(spacing: 8) {
-                    Button("Index New Photos") {
-                        Task { await viewModel.indexAllFolders() }
-                    }
-                    .disabled(!settings.hasApiKey || settings.indexFolders.isEmpty)
-                    .controlSize(.small)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Button("Index All") {
+                            showIndexingStartedAlert = true
+                            Task {
+                                await viewModel.indexAllFolders(
+                                    includeVideos: settings.indexVideosEnabled,
+                                    includeICloud: settings.indexIncludeICloud
+                                )
+                            }
+                        }
+                        .disabled(!settings.hasApiKey || settings.indexFolders.isEmpty)
+                        .controlSize(.small)
 
-                    Button("Re-index All") {
-                        Task { await viewModel.reindexAll() }
-                    }
-                    .disabled(!settings.hasApiKey || settings.indexFolders.isEmpty)
-                    .controlSize(.small)
+                        Button("Re-index All") {
+                            showIndexingStartedAlert = true
+                            Task { await viewModel.reindexAll() }
+                        }
+                        .disabled(!settings.hasApiKey || settings.indexFolders.isEmpty)
+                        .controlSize(.small)
 
-                    Spacer()
+                        Spacer()
 
-                    Button("Clear Index") {
-                        showClearIndexAlert = true
+                        Button("Clear Index") {
+                            showClearIndexAlert = true
+                        }
+                        .foregroundStyle(.red)
+                        .controlSize(.small)
+                        .disabled(viewModel.indexedCount == 0)
                     }
-                    .foregroundStyle(.red)
-                    .controlSize(.small)
-                    .disabled(viewModel.indexedCount == 0)
+
+                    HStack(spacing: 16) {
+                        Toggle("Include Videos", isOn: Bindable(settings).indexVideosEnabled)
+                            .toggleStyle(.checkbox)
+                            .controlSize(.small)
+                        Toggle("Include iCloud", isOn: Bindable(settings).indexIncludeICloud)
+                            .toggleStyle(.checkbox)
+                            .controlSize(.small)
+                    }
+                    .font(.system(size: 12))
                 }
             }
         }
@@ -282,6 +363,8 @@ var body: some View {
             Toggle("Show Similarity %", isOn: Bindable(settings).showSimilarityPercent)
                 .font(.system(size: 13))
             Toggle("Launch at Login", isOn: Bindable(settings).launchAtLogin)
+                .font(.system(size: 13))
+            Toggle("Solid Dark Background", isOn: Bindable(settings).solidDarkMode)
                 .font(.system(size: 13))
         }
     }

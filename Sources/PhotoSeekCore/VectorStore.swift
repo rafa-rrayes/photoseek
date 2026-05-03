@@ -7,7 +7,9 @@ private let SQLITE_TRANSIENT_PTR = unsafeBitCast(-1, to: sqlite3_destructor_type
 public actor VectorStore {
     private var db: OpaquePointer?
     private var photos: [StoredPhoto] = []
-    private var uuidSet: Set<String> = []
+    private var videos: [StoredVideo] = []
+    private var photoUUIDSet: Set<String> = []
+    private var videoUUIDSet: Set<String> = []
 
     public struct StoredPhoto: Sendable {
         public let uuid: String
@@ -22,16 +24,35 @@ public actor VectorStore {
         public let magnitude: Float
     }
 
-    public var count: Int { photos.count }
+    public struct StoredVideo: Sendable {
+        public let uuid: String
+        public let filename: String
+        public let date: String
+        public let path: String
+        public let title: String
+        public let albums: [String]
+        public let persons: [String]
+        public let durationSeconds: Double
+        public let embedding: [Float]
+        public let magnitude: Float
+    }
+
+    public var count: Int { photos.count + videos.count }
+    public var photoCount: Int { photos.count }
+    public var videoCount: Int { videos.count }
 
     public init() {}
 
     public func contains(uuid: String) -> Bool {
-        uuidSet.contains(uuid)
+        photoUUIDSet.contains(uuid) || videoUUIDSet.contains(uuid)
     }
 
-    public func indexedUUIDs() -> Set<String> {
-        uuidSet
+    public func indexedPhotoUUIDs() -> Set<String> {
+        photoUUIDSet
+    }
+
+    public func indexedVideoUUIDs() -> Set<String> {
+        videoUUIDSet
     }
 
     public func open(at path: String) throws {
@@ -42,22 +63,22 @@ public actor VectorStore {
             throw StoreError.cannotOpen(path)
         }
 
-        try createTable()
+        try createTables()
     }
 
     public func loadAll() throws {
         guard let db else { throw StoreError.notOpen }
 
+        // Load photos
         var stmt: OpaquePointer?
-        let query = "SELECT uuid, filename, date, path, title, albums, persons, embedding, derivative FROM photos"
+        let photoQuery = "SELECT uuid, filename, date, path, title, albums, persons, embedding, derivative FROM photos"
 
-        guard sqlite3_prepare_v2(db, query, -1, &stmt, nil) == SQLITE_OK else {
+        guard sqlite3_prepare_v2(db, photoQuery, -1, &stmt, nil) == SQLITE_OK else {
             throw StoreError.queryFailed(String(cString: sqlite3_errmsg(db)))
         }
-        defer { sqlite3_finalize(stmt) }
 
-        var loaded: [StoredPhoto] = []
-        var ids: Set<String> = []
+        var loadedPhotos: [StoredPhoto] = []
+        var photoIds: Set<String> = []
 
         while sqlite3_step(stmt) == SQLITE_ROW {
             let uuid = columnText(stmt, 0)
@@ -67,7 +88,6 @@ public actor VectorStore {
             let title = columnText(stmt, 4)
             let albumsJson = columnText(stmt, 5)
             let personsJson = columnText(stmt, 6)
-
             let embedding = columnFloats(stmt, 7)
             guard !embedding.isEmpty else { continue }
             let derivative = columnText(stmt, 8)
@@ -76,7 +96,7 @@ public actor VectorStore {
             vDSP_svesq(embedding, 1, &mag, vDSP_Length(embedding.count))
             mag = sqrt(mag)
 
-            loaded.append(StoredPhoto(
+            loadedPhotos.append(StoredPhoto(
                 uuid: uuid,
                 filename: filename,
                 date: date,
@@ -88,48 +108,127 @@ public actor VectorStore {
                 embedding: embedding,
                 magnitude: mag
             ))
-            ids.insert(uuid)
+            photoIds.insert(uuid)
+        }
+        sqlite3_finalize(stmt)
+        stmt = nil
+
+        // Load videos
+        let videoQuery = "SELECT uuid, filename, date, path, title, albums, persons, duration_seconds, embedding FROM videos"
+
+        guard sqlite3_prepare_v2(db, videoQuery, -1, &stmt, nil) == SQLITE_OK else {
+            throw StoreError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        var loadedVideos: [StoredVideo] = []
+        var videoIds: Set<String> = []
+
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let uuid = columnText(stmt, 0)
+            let filename = columnText(stmt, 1)
+            let date = columnText(stmt, 2)
+            let path = columnText(stmt, 3)
+            let title = columnText(stmt, 4)
+            let albumsJson = columnText(stmt, 5)
+            let personsJson = columnText(stmt, 6)
+            let duration = sqlite3_column_double(stmt, 7)
+            let embedding = columnFloats(stmt, 8)
+            guard !embedding.isEmpty else { continue }
+
+            var mag: Float = 0
+            vDSP_svesq(embedding, 1, &mag, vDSP_Length(embedding.count))
+            mag = sqrt(mag)
+
+            loadedVideos.append(StoredVideo(
+                uuid: uuid,
+                filename: filename,
+                date: date,
+                path: path,
+                title: title,
+                albums: parseJsonArray(albumsJson),
+                persons: parseJsonArray(personsJson),
+                durationSeconds: duration,
+                embedding: embedding,
+                magnitude: mag
+            ))
+            videoIds.insert(uuid)
         }
 
-        self.photos = loaded
-        self.uuidSet = ids
+        self.photos = loadedPhotos
+        self.videos = loadedVideos
+        self.photoUUIDSet = photoIds
+        self.videoUUIDSet = videoIds
     }
 
-    public func search(queryEmbedding: [Float], limit: Int = 20) -> [SearchResult] {
-        guard !photos.isEmpty else { return [] }
+    public func search(queryEmbedding: [Float], limit: Int = 20, mediaType: MediaType? = nil) -> [SearchResult] {
+        let includePhotos = mediaType != .video
+        let includeVideos = mediaType != .photo
+        guard (includePhotos && !photos.isEmpty) || (includeVideos && !videos.isEmpty) else { return [] }
 
         var queryMag: Float = 0
         vDSP_svesq(queryEmbedding, 1, &queryMag, vDSP_Length(queryEmbedding.count))
         queryMag = sqrt(queryMag)
         guard queryMag > 0 else { return [] }
 
-        var scores: [(index: Int, score: Float)] = []
-        scores.reserveCapacity(photos.count)
+        // (kind: 0 = photo, 1 = video, index, score)
+        var scores: [(kind: Int, index: Int, score: Float)] = []
+        scores.reserveCapacity(photos.count + videos.count)
 
-        for (i, photo) in photos.enumerated() {
-            guard photo.magnitude > 0 else { continue }
-            var dot: Float = 0
-            vDSP_dotpr(queryEmbedding, 1, photo.embedding, 1, &dot, vDSP_Length(queryEmbedding.count))
-            let similarity = dot / (queryMag * photo.magnitude)
-            scores.append((i, similarity))
+        if includePhotos {
+            for (i, photo) in photos.enumerated() {
+                guard photo.magnitude > 0 else { continue }
+                var dot: Float = 0
+                vDSP_dotpr(queryEmbedding, 1, photo.embedding, 1, &dot, vDSP_Length(queryEmbedding.count))
+                scores.append((0, i, dot / (queryMag * photo.magnitude)))
+            }
+        }
+
+        if includeVideos {
+            for (i, video) in videos.enumerated() {
+                guard video.magnitude > 0 else { continue }
+                var dot: Float = 0
+                vDSP_dotpr(queryEmbedding, 1, video.embedding, 1, &dot, vDSP_Length(queryEmbedding.count))
+                scores.append((1, i, dot / (queryMag * video.magnitude)))
+            }
         }
 
         scores.sort { $0.score > $1.score }
 
         return Array(scores.prefix(limit)).enumerated().map { rank, item in
-            let photo = photos[item.index]
-            return SearchResult(
-                rank: rank + 1,
-                score: Double(item.score),
-                uuid: photo.uuid,
-                filename: photo.filename,
-                date: photo.date,
-                path: photo.path,
-                derivative: photo.derivative,
-                title: photo.title,
-                albums: photo.albums,
-                persons: photo.persons
-            )
+            if item.kind == 0 {
+                let photo = photos[item.index]
+                return SearchResult(
+                    rank: rank + 1,
+                    score: Double(item.score),
+                    uuid: photo.uuid,
+                    filename: photo.filename,
+                    date: photo.date,
+                    path: photo.path,
+                    derivative: photo.derivative,
+                    title: photo.title,
+                    albums: photo.albums,
+                    persons: photo.persons,
+                    mediaType: .photo,
+                    durationSeconds: nil
+                )
+            } else {
+                let video = videos[item.index]
+                return SearchResult(
+                    rank: rank + 1,
+                    score: Double(item.score),
+                    uuid: video.uuid,
+                    filename: video.filename,
+                    date: video.date,
+                    path: video.path,
+                    derivative: "",
+                    title: video.title,
+                    albums: video.albums,
+                    persons: video.persons,
+                    mediaType: .video,
+                    durationSeconds: video.durationSeconds
+                )
+            }
         }
     }
 
@@ -166,7 +265,6 @@ public actor VectorStore {
             throw StoreError.queryFailed(String(cString: sqlite3_errmsg(db)))
         }
 
-        // Update in-memory
         var mag: Float = 0
         vDSP_svesq(embedding, 1, &mag, vDSP_Length(embedding.count))
         mag = sqrt(mag)
@@ -176,7 +274,53 @@ public actor VectorStore {
             derivative: "", title: title, albums: albums, persons: persons,
             embedding: embedding, magnitude: mag
         ))
-        uuidSet.insert(uuid)
+        photoUUIDSet.insert(uuid)
+    }
+
+    public func addVideo(uuid: String, filename: String, date: String, path: String,
+                         title: String, albums: [String], persons: [String],
+                         durationSeconds: Double, embedding: [Float]) throws {
+        guard let db else { throw StoreError.notOpen }
+
+        var stmt: OpaquePointer?
+        let insert = """
+            INSERT OR REPLACE INTO videos
+            (uuid, filename, date, path, title, albums, persons, duration_seconds, embedding)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+
+        guard sqlite3_prepare_v2(db, insert, -1, &stmt, nil) == SQLITE_OK else {
+            throw StoreError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        bindText(stmt, 1, uuid)
+        bindText(stmt, 2, filename)
+        bindText(stmt, 3, date)
+        bindText(stmt, 4, path)
+        bindText(stmt, 5, title)
+        bindText(stmt, 6, jsonEncode(albums))
+        bindText(stmt, 7, jsonEncode(persons))
+        sqlite3_bind_double(stmt, 8, durationSeconds)
+
+        _ = embedding.withUnsafeBufferPointer { buf in
+            sqlite3_bind_blob(stmt, 9, buf.baseAddress, Int32(buf.count * MemoryLayout<Float>.size), SQLITE_TRANSIENT_PTR)
+        }
+
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw StoreError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+
+        var mag: Float = 0
+        vDSP_svesq(embedding, 1, &mag, vDSP_Length(embedding.count))
+        mag = sqrt(mag)
+
+        videos.append(StoredVideo(
+            uuid: uuid, filename: filename, date: date, path: path,
+            title: title, albums: albums, persons: persons,
+            durationSeconds: durationSeconds, embedding: embedding, magnitude: mag
+        ))
+        videoUUIDSet.insert(uuid)
     }
 
     public func clearAll() throws {
@@ -184,8 +328,13 @@ public actor VectorStore {
         guard sqlite3_exec(db, "DELETE FROM photos", nil, nil, nil) == SQLITE_OK else {
             throw StoreError.queryFailed(String(cString: sqlite3_errmsg(db)))
         }
+        guard sqlite3_exec(db, "DELETE FROM videos", nil, nil, nil) == SQLITE_OK else {
+            throw StoreError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
         photos.removeAll()
-        uuidSet.removeAll()
+        videos.removeAll()
+        photoUUIDSet.removeAll()
+        videoUUIDSet.removeAll()
     }
 
     public func close() {
@@ -197,9 +346,9 @@ public actor VectorStore {
 
     // MARK: - Private
 
-    private func createTable() throws {
+    private func createTables() throws {
         guard let db else { throw StoreError.notOpen }
-        let sql = """
+        let photoSql = """
             CREATE TABLE IF NOT EXISTS photos (
                 uuid TEXT PRIMARY KEY,
                 filename TEXT,
@@ -215,7 +364,24 @@ public actor VectorStore {
                 embedding BLOB
             )
             """
-        guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
+        guard sqlite3_exec(db, photoSql, nil, nil, nil) == SQLITE_OK else {
+            throw StoreError.queryFailed(String(cString: sqlite3_errmsg(db)))
+        }
+
+        let videoSql = """
+            CREATE TABLE IF NOT EXISTS videos (
+                uuid TEXT PRIMARY KEY,
+                filename TEXT,
+                date TEXT,
+                path TEXT,
+                title TEXT,
+                albums TEXT,
+                persons TEXT,
+                duration_seconds REAL,
+                embedding BLOB
+            )
+            """
+        guard sqlite3_exec(db, videoSql, nil, nil, nil) == SQLITE_OK else {
             throw StoreError.queryFailed(String(cString: sqlite3_errmsg(db)))
         }
     }

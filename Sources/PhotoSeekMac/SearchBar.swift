@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import PhotoSeekCore
 
 struct WindowDragArea: NSViewRepresentable {
     func makeNSView(context: Context) -> DragView { DragView() }
@@ -16,10 +17,12 @@ struct WindowDragArea: NSViewRepresentable {
 
 struct SearchBar: View {
     @Binding var query: String
+    @Binding var mediaTypeFilter: MediaTypeFilter
     var isLoading: Bool
     var indexedCount: Int
     var isSelectMode: Bool
     var hasResults: Bool
+    var showFilter: Bool
     var onSelectToggle: () -> Void
     var onSettingsTap: () -> Void
     @FocusState private var isFocused: Bool
@@ -39,6 +42,18 @@ struct SearchBar: View {
                 ProgressView()
                     .controlSize(.small)
                     .transition(.opacity)
+            }
+
+            if showFilter {
+                Picker("Type", selection: $mediaTypeFilter) {
+                    Text("All").tag(MediaTypeFilter.all)
+                    Text("Photos").tag(MediaTypeFilter.photos)
+                    Text("Videos").tag(MediaTypeFilter.videos)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 180)
+                .controlSize(.small)
             }
 
             if hasResults {

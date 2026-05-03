@@ -9,7 +9,7 @@ RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 ENTITLEMENTS="Sources/PhotoSeekMac/Resources/PhotoSeek.entitlements"
 
 echo "Building ${APP_NAME} macOS (release)..."
-swift build -c release --target PhotoSeekMac
+swift build -c release --product PhotoSeekMac
 
 echo "Creating app bundle..."
 rm -rf "${BUNDLE_DIR}"

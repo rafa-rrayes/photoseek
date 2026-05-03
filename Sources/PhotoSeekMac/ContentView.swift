@@ -6,6 +6,8 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showAlbumPicker = false
 
+    private var settings: SettingsManager { SettingsManager.shared }
+
     var body: some View {
         VStack(spacing: 0) {
             if !viewModel.hasApiKey && !viewModel.isStoreLoaded {
@@ -13,10 +15,14 @@ struct ContentView: View {
             } else {
                 SearchBar(
                     query: $viewModel.query,
+                    mediaTypeFilter: $viewModel.mediaTypeFilter,
                     isLoading: viewModel.isLoading,
                     indexedCount: viewModel.indexedCount,
                     isSelectMode: viewModel.isSelectMode,
                     hasResults: !viewModel.results.isEmpty,
+                    showFilter: !viewModel.results.isEmpty
+                        && !viewModel.query.trimmingCharacters(in: .whitespaces).isEmpty
+                        && viewModel.errorMessage == nil,
                     onSelectToggle: { viewModel.toggleSelectMode() },
                     onSettingsTap: { showSettings = true }
                 )
@@ -55,7 +61,7 @@ struct ContentView: View {
             }
         }
         .frame(width: 680, height: 520)
-        .background(.ultraThinMaterial)
+        .background(panelBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .preferredColorScheme(.dark)
         .task {
@@ -63,7 +69,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView(viewModel: viewModel)
-                .background(.ultraThinMaterial)
+                .background(panelBackground)
                 .preferredColorScheme(.dark)
         }
         .alert("Delete \(viewModel.selectedCount) photo\(viewModel.selectedCount == 1 ? "" : "s")?",
@@ -79,8 +85,17 @@ struct ContentView: View {
                 onSelect: { name in Task { await viewModel.addSelectedToAlbum(name) } },
                 onCreateNew: { name in Task { await viewModel.createAlbumWithSelected(name) } }
             )
-            .background(.ultraThinMaterial)
+            .background(panelBackground)
             .preferredColorScheme(.dark)
+        }
+    }
+
+    @ViewBuilder
+    private var panelBackground: some View {
+        if settings.solidDarkMode {
+            Color(red: 0.10, green: 0.10, blue: 0.11)
+        } else {
+            Rectangle().fill(.ultraThinMaterial)
         }
     }
 

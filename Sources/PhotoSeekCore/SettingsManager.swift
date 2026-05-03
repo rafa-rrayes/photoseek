@@ -46,6 +46,20 @@ public final class SettingsManager {
         didSet { UserDefaults.standard.set(showSimilarityPercent, forKey: "show_similarity_percent") }
     }
 
+    public var solidDarkMode: Bool {
+        didSet { UserDefaults.standard.set(solidDarkMode, forKey: "solid_dark_mode") }
+    }
+
+    // MARK: - Video Indexing
+
+    public var indexVideosEnabled: Bool {
+        didSet { UserDefaults.standard.set(indexVideosEnabled, forKey: "index_videos_enabled") }
+    }
+
+    public var indexIncludeICloud: Bool {
+        didSet { UserDefaults.standard.set(indexIncludeICloud, forKey: "index_include_icloud") }
+    }
+
     // MARK: - Launch at Login (macOS only)
 
     #if os(macOS)
@@ -100,6 +114,18 @@ public final class SettingsManager {
 
         // Display
         self.showSimilarityPercent = defaults.bool(forKey: "show_similarity_percent")
+        self.solidDarkMode = defaults.bool(forKey: "solid_dark_mode")
+
+        // Video indexing — default on for new users.
+        if defaults.object(forKey: "index_videos_enabled") == nil {
+            self.indexVideosEnabled = true
+            defaults.set(true, forKey: "index_videos_enabled")
+        } else {
+            self.indexVideosEnabled = defaults.bool(forKey: "index_videos_enabled")
+        }
+
+        // Include iCloud-only items when indexing — default off (download cost).
+        self.indexIncludeICloud = defaults.bool(forKey: "index_include_icloud")
 
         // Last indexed date
         let ts = defaults.double(forKey: "last_indexed_date")

@@ -8,6 +8,11 @@ struct MacPhotoActionsAdapter: PhotoActionsProtocol {
         PhotosActions.openInPhotos(uuid)
     }
 
+    func openVideo(_ uuid: String) {
+        // Cell handles play directly via NSWorkspace; this is a fallback (e.g. AppleScript jump).
+        PhotosActions.openInPhotos(uuid)
+    }
+
     func favorite(_ uuids: [String]) async -> String? {
         PhotosActions.favorite(uuids)
     }

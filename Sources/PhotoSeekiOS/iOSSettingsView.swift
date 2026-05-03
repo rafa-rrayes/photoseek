@@ -92,8 +92,11 @@ struct iOSSettingsView: View {
                     }
                 }
             } else {
-                Button("Index Photos") {
-                    Task { await viewModel.indexPhotos() }
+                Button("Index Library") {
+                    Task {
+                        await viewModel.indexPhotos()
+                        await viewModel.indexVideos()
+                    }
                 }
                 .disabled(!settings.hasApiKey)
 
@@ -101,6 +104,8 @@ struct iOSSettingsView: View {
                     Task { await viewModel.reindexAll() }
                 }
                 .disabled(!settings.hasApiKey)
+
+                Toggle("Index videos", isOn: Bindable(settings).indexVideosEnabled)
 
                 Button("Clear Index", role: .destructive) {
                     showClearIndexAlert = true
@@ -115,7 +120,7 @@ struct iOSSettingsView: View {
     private var libraryStatsSection: some View {
         Section("Library") {
             HStack {
-                Text("\(viewModel.indexedCount) photos indexed")
+                Text("\(viewModel.indexedCount) items indexed")
                 Spacer()
                 if isScanningStats {
                     ProgressView()
@@ -132,8 +137,10 @@ struct iOSSettingsView: View {
 
             if let stats = libraryStats {
                 LabeledContent("Total Photos", value: "\(stats.totalPhotos)")
-                if stats.totalPhotos > 0 {
-                    let pct = Int(round(Double(viewModel.indexedCount) / Double(stats.totalPhotos) * 100))
+                LabeledContent("Total Videos", value: "\(stats.totalVideos)")
+                let total = stats.totalPhotos + stats.totalVideos
+                if total > 0 {
+                    let pct = Int(round(Double(viewModel.indexedCount) / Double(total) * 100))
                     LabeledContent("Indexed", value: "\(pct)%")
                 }
             }

@@ -32,6 +32,10 @@ PhotoSeek indexes your photo library by generating AI embeddings (via Gemini) fo
 
 This produces a `.app` bundle you can move to `/Applications`.
 
+```bash
+open build/PhotoSeek.app
+```
+
 ### Setup
 
 1. Launch PhotoSeek — it appears in your menu bar

@@ -27,7 +27,12 @@ struct iOSContentView: View {
                         onSelect: { viewModel.toggleSelection($0) },
                         onReachEnd: { Task { await viewModel.loadMore() } },
                         onOpenPhoto: { uuid in
-                            viewModel.photoActions?.openPhoto(uuid)
+                            if let result = viewModel.results.first(where: { $0.uuid == uuid }),
+                               result.mediaType == .video {
+                                viewModel.photoActions?.openVideo(uuid)
+                            } else {
+                                viewModel.photoActions?.openPhoto(uuid)
+                            }
                         }
                     )
                 }
@@ -41,6 +46,18 @@ struct iOSContentView: View {
                         Button(viewModel.isSelectMode ? "Done" : "Select") {
                             viewModel.toggleSelectMode()
                         }
+                    }
+                }
+                ToolbarItem(placement: .principal) {
+                    if !viewModel.results.isEmpty
+                        && !viewModel.query.trimmingCharacters(in: .whitespaces).isEmpty
+                        && viewModel.errorMessage == nil {
+                        Picker("Type", selection: $viewModel.mediaTypeFilter) {
+                            Text("All").tag(MediaTypeFilter.all)
+                            Text("Photos").tag(MediaTypeFilter.photos)
+                            Text("Videos").tag(MediaTypeFilter.videos)
+                        }
+                        .pickerStyle(.segmented)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {

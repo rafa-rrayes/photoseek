@@ -2,6 +2,8 @@
 import Foundation
 import Photos
 import UIKit
+import AVKit
+import AVFoundation
 import PhotoSeekCore
 
 @MainActor
@@ -13,9 +15,25 @@ struct iOSPhotoActions: PhotoActionsProtocol {
         }
     }
 
+    func openVideo(_ uuid: String) {
+        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [uuid], options: nil)
+        guard let asset = assets.firstObject else { return }
+
+        let options = PHVideoRequestOptions()
+        options.isNetworkAccessAllowed = true
+        options.deliveryMode = .automatic
+
+        PHImageManager.default().requestPlayerItem(forVideo: asset, options: options) { item, _ in
+            guard let item else { return }
+            DispatchQueue.main.async {
+                presentPlayer(with: item)
+            }
+        }
+    }
+
     func favorite(_ uuids: [String]) async -> String? {
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: uuids, options: nil)
-        guard assets.count > 0 else { return "No photos found" }
+        guard assets.count > 0 else { return "No items found" }
 
         do {
             try await PHPhotoLibrary.shared().performChanges {
@@ -32,7 +50,7 @@ struct iOSPhotoActions: PhotoActionsProtocol {
 
     func unfavorite(_ uuids: [String]) async -> String? {
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: uuids, options: nil)
-        guard assets.count > 0 else { return "No photos found" }
+        guard assets.count > 0 else { return "No items found" }
 
         do {
             try await PHPhotoLibrary.shared().performChanges {
@@ -58,9 +76,8 @@ struct iOSPhotoActions: PhotoActionsProtocol {
 
     func addToAlbum(_ uuids: [String], albumName: String) async -> String? {
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: uuids, options: nil)
-        guard assets.count > 0 else { return "No photos found" }
+        guard assets.count > 0 else { return "No items found" }
 
-        // Find the album
         let albumOptions = PHFetchOptions()
         albumOptions.predicate = NSPredicate(format: "title == %@", albumName)
         let albums = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: albumOptions)
@@ -79,7 +96,7 @@ struct iOSPhotoActions: PhotoActionsProtocol {
 
     func createAlbumAndAdd(_ uuids: [String], albumName: String) async -> String? {
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: uuids, options: nil)
-        guard assets.count > 0 else { return "No photos found" }
+        guard assets.count > 0 else { return "No items found" }
 
         do {
             try await PHPhotoLibrary.shared().performChanges {
@@ -101,6 +118,25 @@ struct iOSPhotoActions: PhotoActionsProtocol {
             }
         }
         return names
+    }
+}
+
+@MainActor
+private func presentPlayer(with item: AVPlayerItem) {
+    guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+          let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first,
+          var top = window.rootViewController else { return }
+
+    while let presented = top.presentedViewController {
+        top = presented
+    }
+
+    let player = AVPlayer(playerItem: item)
+    let vc = AVPlayerViewController()
+    vc.player = player
+    vc.modalPresentationStyle = .fullScreen
+    top.present(vc, animated: true) {
+        player.play()
     }
 }
 #endif
