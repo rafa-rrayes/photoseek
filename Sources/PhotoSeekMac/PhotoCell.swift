@@ -7,8 +7,20 @@ struct PhotoCell: View {
     var isSelected: Bool = false
     var isSelectMode: Bool = false
     var onSelect: (() -> Void)?
+    @Binding var activeInfoUUID: String?
     @State private var image: NSImage?
     @State private var isHovered = false
+
+    private var isInfoShown: Binding<Bool> {
+        Binding(
+            get: { activeInfoUUID == result.uuid },
+            set: { newValue in
+                if !newValue, activeInfoUUID == result.uuid {
+                    activeInfoUUID = nil
+                }
+            }
+        )
+    }
 
     @ViewBuilder
     private var scoreIndicator: some View {
@@ -125,43 +137,32 @@ struct PhotoCell: View {
         .onTapGesture {
             if isSelectMode {
                 onSelect?()
-            } else if isVideo, !result.path.isEmpty {
-                NSWorkspace.shared.open(URL(fileURLWithPath: result.path))
             } else {
                 PhotosActions.openInPhotos(result.uuid)
             }
         }
         .help(result.filename)
+        .overlay(
+            RightClickCatcher {
+                activeInfoUUID = result.uuid
+            }
+        )
+        .popover(isPresented: isInfoShown, arrowEdge: .trailing) {
+            PhotoInfoPopover(result: result) {
+                activeInfoUUID = nil
+            }
+        }
         .task(id: result.uuid) {
-            if isVideo, !result.path.isEmpty {
-                image = await ImageCache.shared.videoThumbnail(for: result.path)
+            if isVideo {
+                if let posterPath = await ImageCache.shared.videoDerivativePath(forUUID: result.uuid),
+                   let img = await ImageCache.shared.image(for: posterPath) {
+                    image = img
+                } else if !result.path.isEmpty {
+                    image = await ImageCache.shared.videoThumbnail(for: result.path)
+                }
             } else {
                 let loadPath = !result.derivative.isEmpty ? result.derivative : result.path
                 image = await ImageCache.shared.image(for: loadPath)
-            }
-        }
-        .contextMenu {
-            if isVideo {
-                Button("Play Video") {
-                    if !result.path.isEmpty {
-                        NSWorkspace.shared.open(URL(fileURLWithPath: result.path))
-                    }
-                }
-                if FileManager.default.fileExists(atPath: result.path) {
-                    Button("Show in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: result.path)])
-                    }
-                }
-            } else {
-                Button("Open in Photos") { PhotosActions.openInPhotos(result.uuid) }
-                if FileManager.default.fileExists(atPath: result.path) {
-                    Button("Open in Preview") {
-                        NSWorkspace.shared.open(URL(fileURLWithPath: result.path))
-                    }
-                    Button("Show in Finder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: result.path)])
-                    }
-                }
             }
         }
     }

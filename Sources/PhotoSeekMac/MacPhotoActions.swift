@@ -2,8 +2,17 @@ import AppKit
 import Photos
 
 enum PhotosActions {
+    /// PHAsset.localIdentifier is "<UUID>/L0/001"; filesystem-indexed photos use the bare UUID.
+    /// Strip any existing suffix so we can re-append a canonical "/L0/001".
+    private static func bareUUID(_ uuid: String) -> String {
+        if let slash = uuid.firstIndex(of: "/") {
+            return String(uuid[..<slash])
+        }
+        return uuid
+    }
+
     private static func mediaItemRefs(_ uuids: [String]) -> String {
-        uuids.map { "media item id \"\($0)/L0/001\"" }.joined(separator: ", ")
+        uuids.map { "media item id \"\(bareUUID($0))/L0/001\"" }.joined(separator: ", ")
     }
 
     @discardableResult
@@ -24,7 +33,7 @@ enum PhotosActions {
         run("""
             tell application "Photos"
                 activate
-                spotlight media item id "\(uuid)/L0/001"
+                spotlight media item id "\(bareUUID(uuid))/L0/001"
             end tell
             """)
     }
@@ -57,7 +66,7 @@ enum PhotosActions {
 
     static func deletePhotos(_ uuids: [String]) {
         // PhotoKit identifiers use UUID/L0/001 format
-        let localIds = uuids.map { "\($0)/L0/001" }
+        let localIds = uuids.map { "\(bareUUID($0))/L0/001" }
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: localIds, options: nil)
         guard assets.count > 0 else { return }
 

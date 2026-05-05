@@ -33,7 +33,7 @@ struct PhotoSeekApp: App {
     }
 
     private static var menuBarIcon: NSImage {
-        guard let path = Bundle.module.path(forResource: "MenuBarIcon", ofType: "png"),
+        guard let path = AppResourceBundle.bundle.path(forResource: "MenuBarIcon", ofType: "png"),
               let image = NSImage(contentsOfFile: path) else {
             return NSImage()
         }

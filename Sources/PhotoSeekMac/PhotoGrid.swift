@@ -13,6 +13,7 @@ struct PhotoGrid: View {
     @State private var dragStart: CGPoint = .zero
     @State private var dragCurrent: CGPoint = .zero
     @State private var cellFrames: [String: CGRect] = [:]
+    @State private var activeInfoUUID: String?
 
     private let columns = [
         GridItem(.adaptive(minimum: 140, maximum: 180), spacing: 8)
@@ -27,7 +28,8 @@ struct PhotoGrid: View {
                             result: result,
                             isSelected: selectedUUIDs.contains(result.uuid),
                             isSelectMode: isSelectMode,
-                            onSelect: { onSelect?(result.uuid) }
+                            onSelect: { onSelect?(result.uuid) },
+                            activeInfoUUID: $activeInfoUUID
                         )
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
                         .background(
