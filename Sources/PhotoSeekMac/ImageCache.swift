@@ -34,8 +34,8 @@ actor ImageCache {
 
         if !scannedVideoShards.contains(shard) {
             scannedVideoShards.insert(shard)
-            let home = FileManager.default.homeDirectoryForCurrentUser.path
-            let dir = "\(home)/Pictures/Photos Library.photoslibrary/resources/derivatives/masters/\(shard)"
+            let libraryPath = PhotosLibraryAccess.shared.libraryURL.path
+            let dir = "\(libraryPath)/resources/derivatives/masters/\(shard)"
             if let names = try? FileManager.default.contentsOfDirectory(atPath: dir) {
                 for name in names {
                     let lower = name.lowercased()

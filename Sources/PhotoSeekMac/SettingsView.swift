@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var showIndexingStartedAlert = false
     @State private var libraryStats: LibraryStats?
     @State private var isScanningStats = false
+    @State private var photosLibraryAccessible: Bool = PhotosLibraryAccess.shared.canReadLibrary
 
     private var settings: SettingsManager { SettingsManager.shared }
 var body: some View {
@@ -17,6 +18,9 @@ var body: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     header
+                    if !photosLibraryAccessible {
+                        photosLibraryAccessSection
+                    }
                     apiKeySection
                     Divider()
                     indexFoldersSection
@@ -114,6 +118,35 @@ var body: some View {
         }
     }
 
+    // MARK: - Photos Library Access
+
+    private var photosLibraryAccessSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Text("Photos Library access required")
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            Text("PhotoSeek reads your Photos Library directly from disk. Grant access once so it can index your photos and load thumbnails.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Grant Photos Library Access…") {
+                if PhotosLibraryAccess.shared.requestAccess() {
+                    photosLibraryAccessible = PhotosLibraryAccess.shared.canReadLibrary
+                }
+            }
+            .controlSize(.small)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 6).fill(.orange.opacity(0.12)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(.orange.opacity(0.35), lineWidth: 1)
+        )
+    }
+
     // MARK: - API Key
 
     private var apiKeySection: some View {
@@ -167,6 +200,13 @@ var body: some View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                 Spacer()
+                if !settings.indexFolders.contains(defaultPhotosLibraryFolder) {
+                    Button(action: addPhotosLibraryDefault) {
+                        Label("Add Photos Library", systemImage: "photo.stack")
+                            .font(.system(size: 11))
+                    }
+                    .controlSize(.small)
+                }
                 Button(action: addFolder) {
                     Label("Add Folder", systemImage: "plus")
                         .font(.system(size: 11))
@@ -389,11 +429,23 @@ var body: some View {
 
     // MARK: - Helpers
 
+    private var defaultPhotosLibraryFolder: String {
+        PhotosLibraryAccess.shared.libraryURL.appendingPathComponent("originals").path
+    }
+
+    private func addPhotosLibraryDefault() {
+        let path = defaultPhotosLibraryFolder
+        if !settings.indexFolders.contains(path) {
+            settings.indexFolders.append(path)
+        }
+    }
+
     private func addFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
+        panel.treatsFilePackagesAsDirectories = true
         panel.message = "Choose a folder to index photos from"
 
         if panel.runModal() == .OK, let url = panel.url {

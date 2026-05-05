@@ -60,6 +60,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         panelController = PanelController(viewModel: viewModel)
+        promptForPhotosLibraryAccessIfNeeded()
+    }
+
+    /// One-time prompt on launch when the Photos Library can't be read. Avoids
+    /// silently presenting an empty grid / zero-count scan after a fresh
+    /// install or after a TCC grant was lost (e.g. signing identity changed).
+    private func promptForPhotosLibraryAccessIfNeeded() {
+        let access = PhotosLibraryAccess.shared
+        guard !access.canReadLibrary else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Grant access to your Photos Library"
+        alert.informativeText = "PhotoSeek reads your Photos Library directly from disk to index photos and load thumbnails. macOS requires you to grant this access once."
+        alert.addButton(withTitle: "Choose Library…")
+        alert.addButton(withTitle: "Later")
+        alert.alertStyle = .informational
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            access.requestAccess()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

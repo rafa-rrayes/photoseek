@@ -423,8 +423,8 @@ public final class SearchViewModel {
             }
         }
 
-        let home = fm.homeDirectoryForCurrentUser.path
-        let derivativesPath = "\(home)/Pictures/Photos Library.photoslibrary/resources/derivatives"
+        let derivativesPath = PhotosLibraryAccess.shared.libraryURL
+            .appendingPathComponent("resources/derivatives").path
         let missingUUIDs = visibleUUIDs.subtracting(uuidToPath.keys)
         if !missingUUIDs.isEmpty, let enumerator = fm.enumerator(atPath: derivativesPath) {
             while let file = enumerator.nextObject() as? String {
@@ -638,8 +638,8 @@ public final class SearchViewModel {
 
     public func scanLibraryStats() async -> LibraryStats {
         var stats = LibraryStats()
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let dbPath = "\(home)/Pictures/Photos Library.photoslibrary/database/Photos.sqlite"
+        let dbPath = PhotosLibraryAccess.shared.libraryURL
+            .appendingPathComponent("database/Photos.sqlite").path
 
         var db: OpaquePointer?
         guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
@@ -695,8 +695,8 @@ public final class SearchViewModel {
     }
 
     private func loadVisibleUUIDs(kind: Int) -> Set<String> {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let dbPath = "\(home)/Pictures/Photos Library.photoslibrary/database/Photos.sqlite"
+        let dbPath = PhotosLibraryAccess.shared.libraryURL
+            .appendingPathComponent("database/Photos.sqlite").path
 
         var db: OpaquePointer?
         guard sqlite3_open_v2(dbPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {

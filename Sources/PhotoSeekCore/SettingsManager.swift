@@ -133,8 +133,8 @@ public final class SettingsManager {
 
         #if os(macOS)
         // Index folders
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let defaultFolder = "\(home)/Pictures/Photos Library.photoslibrary/originals"
+        let defaultFolder = PhotosLibraryAccess.shared.libraryURL
+            .appendingPathComponent("originals").path
         self.indexFolders = (defaults.stringArray(forKey: "index_folders")) ?? [defaultFolder]
 
         // Launch at login: read current state
