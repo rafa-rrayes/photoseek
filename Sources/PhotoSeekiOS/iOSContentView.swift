@@ -37,7 +37,7 @@ struct iOSContentView: View {
                     )
                 }
             }
-            .navigationTitle("PhotoSeek")
+            .navigationTitle("DejaVi")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $viewModel.query, prompt: "Search your photos...")
             .toolbar {
@@ -108,7 +108,7 @@ struct iOSContentView: View {
             Image(systemName: "sparkle.magnifyingglass")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
-            Text("PhotoSeek")
+            Text("DejaVi")
                 .font(.title.bold())
 
             Text("Search your photos using natural language")

@@ -18,11 +18,33 @@ targets:
       - path: Sources/PhotoSeekiOS
         excludes:
           - "Resources/**"
+      - path: Sources/PhotoSeekiOS/Resources/Assets.xcassets
+        buildPhase: resources
     info:
       path: Sources/PhotoSeekiOS/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: DejaVi
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        LSRequiresIPhoneOS: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSPhotoLibraryUsageDescription: DejaVi needs access to your photo library to index and search your photos.
+        NSPhotoLibraryAddUsageDescription: DejaVi needs permission to create albums and organize your photos.
+        ITSAppUsesNonExemptEncryption: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.rafa.photoseek.ios
+        PRODUCT_BUNDLE_IDENTIFIER: com.rafa.dejavi
+        PRODUCT_NAME: DejaVi
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5"
         CODE_SIGN_STYLE: Automatic
         INFOPLIST_FILE: Sources/PhotoSeekiOS/Resources/Info.plist
