@@ -21,8 +21,9 @@ struct MacPhotoActionsAdapter: PhotoActionsProtocol {
         PhotosActions.unfavorite(uuids)
     }
 
-    func deletePhotos(_ uuids: [String]) async {
+    func deletePhotos(_ uuids: [String]) async -> Bool {
         PhotosActions.deletePhotos(uuids)
+        return true
     }
 
     func addToAlbum(_ uuids: [String], albumName: String) async -> String? {

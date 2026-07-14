@@ -8,6 +8,7 @@ struct iOSPhotoCell: View {
     var isSelectMode: Bool = false
     var onSelect: (() -> Void)?
     var onOpen: (() -> Void)?
+    var onEnterSelectMode: (() -> Void)?
     @State private var image: UIImage?
 
     @ViewBuilder
@@ -68,12 +69,13 @@ struct iOSPhotoCell: View {
                     scoreIndicator
                     Spacer()
                     if let durationLabel {
-                        Text(durationLabel)
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 3))
+                        HStack(spacing: 3) {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 8))
+                            Text(durationLabel)
+                        }
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
                     }
                 }
                 .padding(.horizontal, 6)
@@ -85,6 +87,11 @@ struct iOSPhotoCell: View {
                         endPoint: .bottom
                     )
                 )
+            }
+
+            if isSelected {
+                Rectangle()
+                    .fill(.black.opacity(0.25))
             }
 
             if isSelectMode {
@@ -111,12 +118,12 @@ struct iOSPhotoCell: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(
-            RoundedRectangle(cornerRadius: 4)
-                .strokeBorder(.blue, lineWidth: isSelected ? 2 : 0)
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(.blue, lineWidth: isSelected ? 2.5 : 0)
         )
-        .contentShape(RoundedRectangle(cornerRadius: 4))
+        .contentShape(RoundedRectangle(cornerRadius: 6))
         .onTapGesture {
             if isSelectMode {
                 onSelect?()
@@ -124,16 +131,10 @@ struct iOSPhotoCell: View {
                 onOpen?()
             }
         }
-        .contextMenu {
-            Button { onOpen?() } label: {
-                Label(isVideo ? "Play Video" : "Open in Photos",
-                      systemImage: isVideo ? "play.rectangle" : "photo")
-            }
-            Button {
-                onSelect?()
-            } label: {
-                Label(isSelected ? "Deselect" : "Select", systemImage: isSelected ? "checkmark.circle.fill" : "checkmark.circle")
-            }
+        .onLongPressGesture(minimumDuration: 0.35) {
+            guard !isSelectMode else { return }
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            onEnterSelectMode?()
         }
         .task(id: result.uuid) {
             image = await iOSImageCache.shared.thumbnail(for: result.uuid)

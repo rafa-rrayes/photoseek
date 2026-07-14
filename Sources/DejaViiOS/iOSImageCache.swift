@@ -7,11 +7,13 @@ actor iOSImageCache {
 
     private let cachingManager = PHCachingImageManager()
     private let cache = NSCache<NSString, UIImage>()
+    private let fullCache = NSCache<NSString, UIImage>()
 
     init() {
         cachingManager.allowsCachingHighQualityImages = false
         cache.totalCostLimit = 100 * 1024 * 1024
         cache.countLimit = 200
+        fullCache.countLimit = 6
     }
 
     func thumbnail(for localIdentifier: String, targetSize: CGSize = CGSize(width: 300, height: 300)) async -> UIImage? {
@@ -47,6 +49,45 @@ actor iOSImageCache {
 
         if let image {
             cache.setObject(image, forKey: key)
+        }
+        return image
+    }
+
+    /// Screen-quality image for the full-screen viewer. Kept in a tiny separate
+    /// cache so paging back and forth doesn't refetch, without evicting thumbnails.
+    func fullImage(for localIdentifier: String,
+                   targetSize: CGSize = CGSize(width: 2048, height: 2048)) async -> UIImage? {
+        let key = localIdentifier as NSString
+        if let cached = fullCache.object(forKey: key) {
+            return cached
+        }
+
+        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
+        guard let asset = assets.firstObject else { return nil }
+
+        let options = PHImageRequestOptions()
+        options.deliveryMode = .highQualityFormat
+        options.isNetworkAccessAllowed = true
+        options.resizeMode = .exact
+        options.isSynchronous = false
+
+        let image: UIImage? = await withCheckedContinuation { continuation in
+            var resumed = false
+            PHImageManager.default().requestImage(
+                for: asset,
+                targetSize: targetSize,
+                contentMode: .aspectFit,
+                options: options
+            ) { image, info in
+                let isDegraded = info?[PHImageResultIsDegradedKey] as? Bool ?? false
+                guard !isDegraded, !resumed else { return }
+                resumed = true
+                continuation.resume(returning: image)
+            }
+        }
+
+        if let image {
+            fullCache.setObject(image, forKey: key)
         }
         return image
     }

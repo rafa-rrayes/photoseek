@@ -29,14 +29,11 @@ let package = Package(
                 .swiftLanguageMode(.v5)
             ]
         ),
-        .executableTarget(
-            name: "DejaViiOS",
-            dependencies: ["DejaViCore"],
-            path: "Sources/DejaViiOS",
-            exclude: ["Resources/Info.plist"],
-            swiftSettings: [
-                .swiftLanguageMode(.v5)
-            ]
-        ),
+        // NOTE: The iOS app is built exclusively by the xcodegen-generated
+        // DejaVi.xcodeproj app target (sources in Sources/DejaViiOS, linking the
+        // DejaViCore library). It is deliberately NOT an SPM target — an
+        // executableTarget named "DejaViiOS" collides with the app scheme and
+        // makes `xcodebuild archive` build a command-line tool (SKIP_INSTALL=YES)
+        // instead of the app, producing an empty archive.
     ]
 )

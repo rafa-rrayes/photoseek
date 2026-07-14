@@ -1,47 +1,33 @@
-# Rebrand to DejaVi (complete)
+# iOS UI/UX Revamp — 2026-07-14
 
-The whole product is now **DejaVi**. A competitor shipped an identical app under
-the project's former name, so every trace of the old name was removed from the
-repo — file and directory names, target/module/type names, string literals,
-comments, docs, and build scripts. No data migration: there are no shipped users,
-so old keychain items / Application Support / cache dirs under the old identity
-are abandoned (the app re-asks for the Gemini key on first launch — expected).
+## Root cause of "Select doesn't work"
+The iOS UI put Select / media filter / gear in the navigation toolbar and used
+`.searchable`. On iOS 26 the search field renders as a floating bottom pill and,
+while a query is active, the nav toolbar is minimized away — so Select, the
+All/Photos/Videos picker, and Settings are all unreachable exactly when there
+are results. The selection logic itself (view model + action bar) already works.
 
-## What changed
+## Plan
+- [x] Diagnose select-mode bug (toolbar hidden by iOS 26 search UX)
+- [ ] `iOSSearchHeader.swift` (new): always-visible glass header — search field
+      (magnifier, clear button, spinner), gear; second row when results:
+      All/Photos/Videos segmented + Select/Done. Liquid Glass on iOS 26,
+      material fallback for iOS 17–18.
+- [ ] `iOSContentView.swift`: drop `.searchable`/nav toolbar; safe-area-inset
+      header; indexing progress banner on main screen; full-screen photo viewer;
+      keep sheets/alerts.
+- [ ] `iOSPhotoGrid.swift`: Photos-app-style 3-column grid, 2pt gutters,
+      scroll-dismisses-keyboard, long-press to enter selection.
+- [ ] `iOSPhotoCell.swift`: Photos-style selection (dim + checkmark bottom-right),
+      long-press support, haptics.
+- [ ] `iOSActionBar.swift`: redesigned floating glass bar — count, Select All,
+      favorite, unfavorite, add-to-album, delete, dismiss.
+- [ ] `iOSPhotoViewer.swift` (new): in-app full-screen viewer — swipe between
+      results, pinch/double-tap zoom (UIScrollView-backed), video playback,
+      favorite/share/delete, replaces "kick out to Photos app" openPhoto UX.
+- [ ] Core: `SearchViewModel.removeFromResults` + select-mode entry helper;
+      `deletePhotos` returns success so deleted items leave the results grid.
+- [ ] Verify: xcodegen + xcodebuild (iOS sim) and `swift build` (macOS) both green.
 
-- [x] SPM package → `DejaVi` (Package.swift, project.yml package ref)
-- [x] Shared module/target → `DejaViCore` (`Sources/DejaViCore/`)
-- [x] macOS target → `DejaViMac` (`Sources/DejaViMac/`)
-- [x] iOS target → `DejaViiOS` (`Sources/DejaViiOS/`)
-- [x] project.yml project `name` → `DejaVi` → `DejaVi.xcodeproj`
-- [x] Both app entry-point structs → `DejaViApp`; files → `DejaViApp.swift`
-- [x] macOS entitlements file → `DejaVi.entitlements`
-- [x] macOS bundle id → `com.rafa.dejavi.mac`
-- [x] Keychain service string → `com.rafa.dejavi` (SettingsManager)
-- [x] Persistence paths → `Application Support/DejaVi`, `dejavi.db`
-- [x] SwiftPM resource bundle → `DejaVi_DejaViMac.bundle`
-- [x] build.sh (`DejaVi.app` / `DejaVi.dmg`), README.md, RELEASE.md, all UI strings
-- [x] All renames done with `git mv` so history follows
-
-## Constraints honored (live TestFlight)
-
-- iOS bundle id `com.rafa.dejavi` unchanged (live in App Store Connect).
-- iOS product name `DejaVi`; `DEVELOPMENT_TEAM` untouched.
-- iOS `Info.plist` is xcodegen-generated from project.yml `info.properties`;
-  never hand-edited. Preserved `ITSAppUsesNonExemptEncryption`, both orientation
-  arrays (iPhone + iPad), the two photo-permission strings, `CFBundleDisplayName`.
-
-## Verification
-
-- grep / find for the old name across the tree return nothing.
-- `swift build` (macOS/SPM) succeeds.
-- `xcodegen generate` + `xcodebuild -project DejaVi.xcodeproj -scheme DejaViiOS`
-  build succeeds; built bundle CFBundleIdentifier=com.rafa.dejavi,
-  CFBundleDisplayName=DejaVi.
-- `./build.sh` produces a signed `DejaVi.app` / `DejaVi.dmg`.
-
-## Manual follow-up
-
-Repo-directory / GitHub-repo rename, developer-portal cleanup of the obsolete iOS
-App ID, and the TestFlight re-archive are tracked in the session hand-off notes
-(out of scope for the in-repo rebrand).
+## Review
+(to fill in after implementation)

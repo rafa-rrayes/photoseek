@@ -7,7 +7,7 @@ import DejaViCore
 @MainActor
 final class iOSPhotoProvider: PhotoProvider {
 
-    func photosToIndex(excluding indexed: Set<String>) async -> [PhotoInfo] {
+    nonisolated func photosToIndex(excluding indexed: Set<String>) async -> [PhotoInfo] {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.includeHiddenAssets = false
@@ -44,7 +44,7 @@ final class iOSPhotoProvider: PhotoProvider {
         return EmbeddingPreparer.prepareFromData(data)
     }
 
-    func videosToIndex(excluding indexed: Set<String>) async -> [VideoInfo] {
+    nonisolated func videosToIndex(excluding indexed: Set<String>) async -> [VideoInfo] {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         options.includeHiddenAssets = false
@@ -91,7 +91,7 @@ final class iOSPhotoProvider: PhotoProvider {
         return VideoBytes(data: prepared.data, mimeType: prepared.mimeType)
     }
 
-    func scanLibraryStats() async -> LibraryStats {
+    nonisolated func scanLibraryStats() async -> LibraryStats {
         let options = PHFetchOptions()
         options.includeHiddenAssets = false
 

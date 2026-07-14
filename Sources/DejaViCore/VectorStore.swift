@@ -63,7 +63,27 @@ public actor VectorStore {
             throw StoreError.cannotOpen(path)
         }
 
+        // Crash-hardening pragmas. Best-effort: a non-OK PRAGMA (e.g. journal_mode
+        // failing to switch on some filesystems) must not fail the whole open, so we
+        // attempt each and ignore its result. WAL + synchronous=NORMAL keeps every
+        // committed row durable across a hard app kill (swipe-to-close / SIGKILL).
+        applyPragmas()
+
         try createTables()
+    }
+
+    /// Enable WAL journaling and crash-safe pragmas. Called right after open.
+    private func applyPragmas() {
+        guard let db else { return }
+        // Write-Ahead Logging: commits append to the -wal file and survive a hard
+        // process kill; the DB is never left mid-write like the default rollback journal.
+        sqlite3_exec(db, "PRAGMA journal_mode=WAL;", nil, nil, nil)
+        // NORMAL fsyncs at checkpoint (and WAL commits are still durable across an app
+        // kill because the OS flushes the -wal file) — full data safety without the
+        // per-write fsync cost of FULL.
+        sqlite3_exec(db, "PRAGMA synchronous=NORMAL;", nil, nil, nil)
+        // Wait up to 5s on a locked DB instead of failing immediately.
+        sqlite3_exec(db, "PRAGMA busy_timeout=5000;", nil, nil, nil)
     }
 
     public func loadAll() throws {
@@ -337,8 +357,19 @@ public actor VectorStore {
         videoUUIDSet.removeAll()
     }
 
+    /// Fold the WAL back into the main database file. Cheap enough to call when the
+    /// app backgrounds so the -wal file doesn't grow unbounded between clean shutdowns.
+    /// PASSIVE never blocks on active readers/writers.
+    public func checkpoint() {
+        guard let db else { return }
+        sqlite3_exec(db, "PRAGMA wal_checkpoint(PASSIVE);", nil, nil, nil)
+    }
+
     public func close() {
         if let db {
+            // Truncate-checkpoint on clean shutdown so the WAL is fully merged back into
+            // the main db file and the -wal/-shm files are reset to zero length.
+            sqlite3_exec(db, "PRAGMA wal_checkpoint(TRUNCATE);", nil, nil, nil)
             sqlite3_close(db)
             self.db = nil
         }

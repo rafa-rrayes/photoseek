@@ -170,6 +170,7 @@ public final class SearchViewModel {
         isIndexing = true
         indexingDone = 0
         errorMessage = nil
+        setIndexingInProgress(true)
 
         let indexedUUIDs = await store.indexedPhotoUUIDs()
         let toIndex = await provider.photosToIndex(excluding: indexedUUIDs)
@@ -177,6 +178,7 @@ public final class SearchViewModel {
         indexingTotal = toIndex.count
         if toIndex.isEmpty {
             isIndexing = false
+            setIndexingInProgress(false)
             return
         }
 
@@ -202,7 +204,10 @@ public final class SearchViewModel {
             }
         }
 
+        // Only clear the resume flag if the queue fully drained (not stopped/interrupted).
+        let completed = isIndexing && indexingDone >= indexingTotal
         isIndexing = false
+        if completed { setIndexingInProgress(false) }
         SettingsManager.shared.lastIndexedDate = Date()
     }
 
@@ -262,6 +267,7 @@ public final class SearchViewModel {
         isIndexing = true
         indexingDone = 0
         errorMessage = nil
+        setIndexingInProgress(true)
 
         let indexedUUIDs = await store.indexedVideoUUIDs()
         let toIndex = await provider.videosToIndex(excluding: indexedUUIDs)
@@ -269,6 +275,7 @@ public final class SearchViewModel {
         indexingTotal = toIndex.count
         if toIndex.isEmpty {
             isIndexing = false
+            setIndexingInProgress(false)
             return
         }
 
@@ -294,7 +301,10 @@ public final class SearchViewModel {
             }
         }
 
+        // Only clear the resume flag if the queue fully drained (not stopped/interrupted).
+        let completed = isIndexing && indexingDone >= indexingTotal
         isIndexing = false
+        if completed { setIndexingInProgress(false) }
         SettingsManager.shared.lastIndexedDate = Date()
     }
 
@@ -382,6 +392,37 @@ public final class SearchViewModel {
 
     public func stopIndexing() {
         isIndexing = false
+    }
+
+    // MARK: - Background resume support
+
+    /// Persisted marker (UserDefaults) recording that an indexing session was
+    /// started and has not yet fully completed. The iOS background-execution
+    /// layer reads this to decide whether to resume indexing on foreground or
+    /// on a BGProcessingTask relaunch. Cross-platform safe (UserDefaults only).
+    private static let indexingInProgressKey = "dejavi.indexing_in_progress"
+
+    private func setIndexingInProgress(_ value: Bool) {
+        UserDefaults.standard.set(value, forKey: Self.indexingInProgressKey)
+    }
+
+    /// Whether an indexing session is persisted as incomplete (may be resumed).
+    public var isIndexingInProgressPersisted: Bool {
+        UserDefaults.standard.bool(forKey: Self.indexingInProgressKey)
+    }
+
+    /// Resume a previously-interrupted indexing session. Safe to call on launch
+    /// or when returning to the foreground: it no-ops unless a session was left
+    /// incomplete, nothing is already running, and an API key exists. The store
+    /// skips already-indexed items (`indexedPhotoUUIDs()` / `indexedVideoUUIDs()`),
+    /// so simply re-running continues from where it stopped.
+    public func resumeIndexingIfNeeded() async {
+        guard isIndexingInProgressPersisted else { return }
+        guard !isIndexing else { return }
+        guard SettingsManager.shared.hasApiKey else { return }
+        await indexPhotos()
+        if Task.isCancelled { return }
+        await indexVideos()
     }
 
     #if os(macOS)
@@ -777,6 +818,27 @@ public final class SearchViewModel {
         }
     }
 
+    /// Enter select mode directly (e.g. from a long-press on a photo),
+    /// optionally selecting the pressed item.
+    public func enterSelectMode(selecting uuid: String? = nil) {
+        isSelectMode = true
+        if let uuid { selectedUUIDs.insert(uuid) }
+    }
+
+    public func removeFromResults(_ uuids: Set<String>) {
+        results.removeAll { uuids.contains($0.uuid) }
+    }
+
+    /// Delete arbitrary items (used by the photo viewer). Removes them from
+    /// the current results only when the deletion actually happened.
+    @discardableResult
+    public func deleteItems(_ uuids: [String]) async -> Bool {
+        guard let actions = photoActions else { return false }
+        let deleted = await actions.deletePhotos(uuids)
+        if deleted { removeFromResults(Set(uuids)) }
+        return deleted
+    }
+
     public func favoriteSelected() async {
         if let actions = photoActions {
             if let error = await actions.favorite(Array(selectedUUIDs)) {
@@ -800,9 +862,7 @@ public final class SearchViewModel {
     }
 
     public func deleteSelected() async {
-        if let actions = photoActions {
-            await actions.deletePhotos(Array(selectedUUIDs))
-        }
+        await deleteItems(Array(selectedUUIDs))
         clearSelection()
     }
 

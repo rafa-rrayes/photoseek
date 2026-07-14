@@ -65,12 +65,18 @@ struct iOSPhotoActions: PhotoActionsProtocol {
         }
     }
 
-    func deletePhotos(_ uuids: [String]) async {
+    func deletePhotos(_ uuids: [String]) async -> Bool {
         let assets = PHAsset.fetchAssets(withLocalIdentifiers: uuids, options: nil)
-        guard assets.count > 0 else { return }
+        guard assets.count > 0 else { return false }
 
-        try? await PHPhotoLibrary.shared().performChanges {
-            PHAssetChangeRequest.deleteAssets(assets)
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.deleteAssets(assets)
+            }
+            return true
+        } catch {
+            // Thrown when the user cancels the system confirmation dialog.
+            return false
         }
     }
 

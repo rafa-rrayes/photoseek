@@ -43,17 +43,17 @@ public struct VideoBytes: Sendable {
 @MainActor
 public protocol PhotoProvider {
     /// Returns photos that need indexing (not yet in the store).
-    func photosToIndex(excluding indexed: Set<String>) async -> [PhotoInfo]
+    nonisolated func photosToIndex(excluding indexed: Set<String>) async -> [PhotoInfo]
 
     /// Provides JPEG data suitable for embedding from a photo.
     func imageDataForEmbedding(_ photo: PhotoInfo) async -> Data?
 
     /// Returns videos that need indexing (not yet in the store).
-    func videosToIndex(excluding indexed: Set<String>) async -> [VideoInfo]
+    nonisolated func videosToIndex(excluding indexed: Set<String>) async -> [VideoInfo]
 
     /// Provides mp4 bytes (≤ 120s) suitable for embedding from a video.
     func videoBytesForEmbedding(_ video: VideoInfo) async -> VideoBytes?
 
     /// Library statistics.
-    func scanLibraryStats() async -> LibraryStats
+    nonisolated func scanLibraryStats() async -> LibraryStats
 }
