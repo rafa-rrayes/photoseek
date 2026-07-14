@@ -1,4 +1,4 @@
-# PhotoSeek
+# DejaVi
 
 A Raycast-style semantic photo search app for macOS. Search your Photos library using natural language — find photos by what's *in* them, not by tags or filenames.
 
@@ -6,7 +6,7 @@ A Raycast-style semantic photo search app for macOS. Search your Photos library 
 
 ## How It Works
 
-PhotoSeek indexes your photo library by generating AI embeddings (via Gemini) for each image, then performs cosine similarity search against your natural language queries. Type "sunset on the beach" and get visually matching photos ranked by similarity score.
+DejaVi indexes your photo library by generating AI embeddings (via Gemini) for each image, then performs cosine similarity search against your natural language queries. Type "sunset on the beach" and get visually matching photos ranked by similarity score.
 
 ## Features
 
@@ -33,17 +33,17 @@ PhotoSeek indexes your photo library by generating AI embeddings (via Gemini) fo
 This produces a `.app` bundle you can move to `/Applications`.
 
 ```bash
-open build/PhotoSeek.app
+open build/DejaVi.app
 ```
 
 ### Setup
 
-1. Launch PhotoSeek — it appears in your menu bar
+1. Launch DejaVi — it appears in your menu bar
 2. Open Settings and enter your Gemini API key
 3. Click **Index Photos** to start indexing your library
 4. Click the menu bar icon to search
 
-By default, PhotoSeek indexes from `~/Pictures/Photos Library.photoslibrary/originals`.
+By default, DejaVi indexes from `~/Pictures/Photos Library.photoslibrary/originals`.
 
 ## Architecture
 

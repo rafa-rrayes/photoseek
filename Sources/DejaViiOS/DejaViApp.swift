@@ -1,10 +1,10 @@
 #if os(iOS)
 import SwiftUI
 import Photos
-import PhotoSeekCore
+import DejaViCore
 
 @main
-struct PhotoSeekiOSApp: App {
+struct DejaViApp: App {
     @State private var store = VectorStore()
     @State private var viewModel: SearchViewModel?
     @State private var authStatus: PHAuthorizationStatus = .notDetermined

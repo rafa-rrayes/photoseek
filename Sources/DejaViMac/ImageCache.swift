@@ -1,7 +1,7 @@
 import AppKit
 import ImageIO
 import AVFoundation
-import PhotoSeekCore
+import DejaViCore
 
 actor ImageCache {
     static let shared = ImageCache()

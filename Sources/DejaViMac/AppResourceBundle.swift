@@ -9,7 +9,7 @@ import Foundation
 // `swift run` (and tests) keep working via the `Bundle.module` fallback.
 enum AppResourceBundle {
     static let bundle: Bundle = {
-        let name = "PhotoSeek_PhotoSeekMac.bundle"
+        let name = "DejaVi_DejaViMac.bundle"
         if let resourceURL = Bundle.main.resourceURL {
             let candidate = resourceURL.appendingPathComponent(name)
             if let bundle = Bundle(url: candidate) {

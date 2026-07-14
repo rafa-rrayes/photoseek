@@ -1,6 +1,6 @@
 #if os(iOS)
 import SwiftUI
-import PhotoSeekCore
+import DejaViCore
 
 struct iOSPhotoGrid: View {
     let results: [SearchResult]

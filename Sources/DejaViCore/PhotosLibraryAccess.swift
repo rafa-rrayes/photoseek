@@ -62,7 +62,7 @@ public final class PhotosLibraryAccess: @unchecked Sendable {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         panel.treatsFilePackagesAsDirectories = false
-        panel.message = "Select your Photos Library so PhotoSeek can read its contents.\nThis is normally at ~/Pictures/Photos Library.photoslibrary"
+        panel.message = "Select your Photos Library so DejaVi can read its contents.\nThis is normally at ~/Pictures/Photos Library.photoslibrary"
         panel.prompt = "Grant Access"
 
         let pictures = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask).first

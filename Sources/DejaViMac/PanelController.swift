@@ -1,6 +1,6 @@
 import AppKit
 import SwiftUI
-import PhotoSeekCore
+import DejaViCore
 
 class FloatingPanel: NSPanel {
     init(contentRect: NSRect) {

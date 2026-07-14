@@ -1,5 +1,5 @@
 import Foundation
-import PhotoSeekCore
+import DejaViCore
 
 /// Adapts the existing AppleScript-based PhotosActions to the PhotoActionsProtocol.
 @MainActor

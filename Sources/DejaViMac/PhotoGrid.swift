@@ -1,5 +1,5 @@
 import SwiftUI
-import PhotoSeekCore
+import DejaViCore
 
 struct PhotoGrid: View {
     let results: [SearchResult]

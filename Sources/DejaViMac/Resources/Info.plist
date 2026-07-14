@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.rafa.photoseek</string>
+    <string>com.rafa.dejavi.mac</string>
     <key>CFBundleName</key>
-    <string>PhotoSeek</string>
+    <string>DejaVi</string>
     <key>CFBundleDisplayName</key>
-    <string>PhotoSeek</string>
+    <string>DejaVi</string>
     <key>CFBundleExecutable</key>
-    <string>PhotoSeek</string>
+    <string>DejaVi</string>
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleShortVersionString</key>
@@ -23,9 +23,9 @@
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>PhotoSeek needs access to your Photos library to index and search your photos.</string>
+    <string>DejaVi needs access to your Photos library to index and search your photos.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>PhotoSeek uses AppleScript to open photos in the Photos app.</string>
+    <string>DejaVi uses AppleScript to open photos in the Photos app.</string>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright 2026 Rafa. All rights reserved.</string>
 </dict>

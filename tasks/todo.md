@@ -1,28 +1,47 @@
-# Rename iOS app to DejaVi + TestFlight prep
+# Rebrand to DejaVi (complete)
 
-Approved scope (user picked the name "DejaVi" after offer to do rename + TestFlight prep in one pass).
-macOS app/brand intentionally untouched — it has shipped customers; separate decision.
+The whole product is now **DejaVi**. A competitor shipped an identical app under
+the project's former name, so every trace of the old name was removed from the
+repo — file and directory names, target/module/type names, string literals,
+comments, docs, and build scripts. No data migration: there are no shipped users,
+so old keychain items / Application Support / cache dirs under the old identity
+are abandoned (the app re-asks for the Gemini key on first launch — expected).
 
-- [x] Flatten logo.png (has alpha) to opaque 1024×1024 AppIcon.png via CoreGraphics
-- [x] Create Assets.xcassets with single-size AppIcon set
-- [x] Info.plist: CFBundleDisplayName=DejaVi, update permission strings, ITSAppUsesNonExemptEncryption=NO
-- [x] project.yml: PRODUCT_BUNDLE_IDENTIFIER=com.rafa.dejavi, PRODUCT_NAME=DejaVi, wire in asset catalog + ASSETCATALOG_COMPILER_APPICON_NAME
-- [x] iOSContentView.swift: replace 2 user-visible "PhotoSeek" strings
-- [x] Regenerate Xcode project (xcodegen)
-- [x] Verify: simulator build compiles, icon in built app, plist values correct
+## What changed
 
-## Review
+- [x] SPM package → `DejaVi` (Package.swift, project.yml package ref)
+- [x] Shared module/target → `DejaViCore` (`Sources/DejaViCore/`)
+- [x] macOS target → `DejaViMac` (`Sources/DejaViMac/`)
+- [x] iOS target → `DejaViiOS` (`Sources/DejaViiOS/`)
+- [x] project.yml project `name` → `DejaVi` → `DejaVi.xcodeproj`
+- [x] Both app entry-point structs → `DejaViApp`; files → `DejaViApp.swift`
+- [x] macOS entitlements file → `DejaVi.entitlements`
+- [x] macOS bundle id → `com.rafa.dejavi.mac`
+- [x] Keychain service string → `com.rafa.dejavi` (SettingsManager)
+- [x] Persistence paths → `Application Support/DejaVi`, `dejavi.db`
+- [x] SwiftPM resource bundle → `DejaVi_DejaViMac.bundle`
+- [x] build.sh (`DejaVi.app` / `DejaVi.dmg`), README.md, RELEASE.md, all UI strings
+- [x] All renames done with `git mv` so history follows
 
-- App Store search: no name collision for "DejaVi" (only unrelated "Tajale" matched).
-- Gotcha found: `xcodegen generate` OVERWRITES Sources/PhotoSeekiOS/Resources/Info.plist
-  (project.yml `info:` block = generated plist). Prior hand-edits were being silently
-  clobbered. Fixed properly: all plist keys now live in project.yml `info.properties`,
-  so generation is reproducible. Never hand-edit that Info.plist.
-- Keychain service "com.rafa.photoseek" in PhotoSeekCore/SettingsManager.swift left
-  unchanged on purpose — it's a hardcoded service string shared with macOS, not tied
-  to bundle ID.
-- Verified: simulator build succeeds; built bundle is DejaVi.app with
-  CFBundleIdentifier=com.rafa.dejavi, CFBundleDisplayName=DejaVi, Assets.car with
-  compiled AppIcon, CFBundleIconName=AppIcon present (App Store validation requirement),
-  icon PNG is 1024×1024 with no alpha (transparency is an upload rejection).
-- macOS target, PhotoSeekCore, repo name: still PhotoSeek (unchanged).
+## Constraints honored (live TestFlight)
+
+- iOS bundle id `com.rafa.dejavi` unchanged (live in App Store Connect).
+- iOS product name `DejaVi`; `DEVELOPMENT_TEAM` untouched.
+- iOS `Info.plist` is xcodegen-generated from project.yml `info.properties`;
+  never hand-edited. Preserved `ITSAppUsesNonExemptEncryption`, both orientation
+  arrays (iPhone + iPad), the two photo-permission strings, `CFBundleDisplayName`.
+
+## Verification
+
+- grep / find for the old name across the tree return nothing.
+- `swift build` (macOS/SPM) succeeds.
+- `xcodegen generate` + `xcodebuild -project DejaVi.xcodeproj -scheme DejaViiOS`
+  build succeeds; built bundle CFBundleIdentifier=com.rafa.dejavi,
+  CFBundleDisplayName=DejaVi.
+- `./build.sh` produces a signed `DejaVi.app` / `DejaVi.dmg`.
+
+## Manual follow-up
+
+Repo-directory / GitHub-repo rename, developer-portal cleanup of the obsolete iOS
+App ID, and the TestFlight re-archive are tracked in the session hand-off notes
+(out of scope for the in-repo rebrand).

@@ -1,6 +1,6 @@
 import SwiftUI
 import AppKit
-import PhotoSeekCore
+import DejaViCore
 
 struct PhotoInfoPopover: View {
     let result: SearchResult

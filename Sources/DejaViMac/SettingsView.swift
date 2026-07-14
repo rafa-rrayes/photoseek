@@ -1,5 +1,5 @@
 import SwiftUI
-import PhotoSeekCore
+import DejaViCore
 
 struct SettingsView: View {
     @Bindable var viewModel: SearchViewModel
@@ -128,7 +128,7 @@ var body: some View {
                 Text("Photos Library access required")
                     .font(.system(size: 12, weight: .semibold))
             }
-            Text("PhotoSeek reads your Photos Library directly from disk. Grant access once so it can index your photos and load thumbnails.")
+            Text("DejaVi reads your Photos Library directly from disk. Grant access once so it can index your photos and load thumbnails.")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -418,7 +418,7 @@ var body: some View {
                 .foregroundStyle(.secondary)
 
             let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
-            Text("PhotoSeek v\(version)")
+            Text("DejaVi v\(version)")
                 .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
             Text("Semantic photo search powered by Gemini")

@@ -1,9 +1,9 @@
 import SwiftUI
 import AppKit
-import PhotoSeekCore
+import DejaViCore
 
 @main
-struct PhotoSeekApp: App {
+struct DejaViApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
 
     var body: some Scene {
@@ -25,7 +25,7 @@ struct PhotoSeekApp: App {
                     .disabled(true)
             }
             Divider()
-            Button("Quit PhotoSeek") {
+            Button("Quit DejaVi") {
                 NSApp.terminate(nil)
             }
             .keyboardShortcut("q")
@@ -72,7 +72,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let alert = NSAlert()
         alert.messageText = "Grant access to your Photos Library"
-        alert.informativeText = "PhotoSeek reads your Photos Library directly from disk to index photos and load thumbnails. macOS requires you to grant this access once."
+        alert.informativeText = "DejaVi reads your Photos Library directly from disk to index photos and load thumbnails. macOS requires you to grant this access once."
         alert.addButton(withTitle: "Choose Library…")
         alert.addButton(withTitle: "Later")
         alert.alertStyle = .informational

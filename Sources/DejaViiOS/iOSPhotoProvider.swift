@@ -2,7 +2,7 @@
 import Foundation
 import Photos
 import AVFoundation
-import PhotoSeekCore
+import DejaViCore
 
 @MainActor
 final class iOSPhotoProvider: PhotoProvider {

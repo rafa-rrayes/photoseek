@@ -90,7 +90,7 @@ public final class SettingsManager {
 
     public var databasePath: String {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("PhotoSeek/photoseek.db").path
+        return appSupport.appendingPathComponent("DejaVi/dejavi.db").path
     }
 
     // MARK: - Init
@@ -149,7 +149,7 @@ public final class SettingsManager {
     private static func migrateFromKeychain() -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.rafa.photoseek",
+            kSecAttrService as String: "com.rafa.dejavi",
             kSecAttrAccount as String: legacyKeychainAccount,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
@@ -164,7 +164,7 @@ public final class SettingsManager {
         // Clean up Keychain entry after migration
         let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.rafa.photoseek",
+            kSecAttrService as String: "com.rafa.dejavi",
             kSecAttrAccount as String: legacyKeychainAccount
         ]
         SecItemDelete(deleteQuery as CFDictionary)

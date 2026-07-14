@@ -3,7 +3,7 @@ import Foundation
 public enum SecureStorage {
     private static var configDir: String {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("PhotoSeek").path
+        return appSupport.appendingPathComponent("DejaVi").path
     }
 
     private static func path(for key: String) -> String {

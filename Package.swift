@@ -3,24 +3,24 @@
 import PackageDescription
 
 let package = Package(
-    name: "PhotoSeek",
+    name: "DejaVi",
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
-        .library(name: "PhotoSeekCore", targets: ["PhotoSeekCore"]),
+        .library(name: "DejaViCore", targets: ["DejaViCore"]),
     ],
     targets: [
         .target(
-            name: "PhotoSeekCore",
-            path: "Sources/PhotoSeekCore",
+            name: "DejaViCore",
+            path: "Sources/DejaViCore",
             swiftSettings: [
                 .swiftLanguageMode(.v5)
             ]
         ),
         .executableTarget(
-            name: "PhotoSeekMac",
-            dependencies: ["PhotoSeekCore"],
-            path: "Sources/PhotoSeekMac",
-            exclude: ["Resources/Info.plist", "Resources/PhotoSeek.entitlements", "Resources/AppIcon.icns"],
+            name: "DejaViMac",
+            dependencies: ["DejaViCore"],
+            path: "Sources/DejaViMac",
+            exclude: ["Resources/Info.plist", "Resources/DejaVi.entitlements", "Resources/AppIcon.icns"],
             resources: [
                 .copy("Resources/MenuBarIcon.png"),
                 .copy("Resources/MenuBarIcon@2x.png"),
@@ -30,9 +30,9 @@ let package = Package(
             ]
         ),
         .executableTarget(
-            name: "PhotoSeekiOS",
-            dependencies: ["PhotoSeekCore"],
-            path: "Sources/PhotoSeekiOS",
+            name: "DejaViiOS",
+            dependencies: ["DejaViCore"],
+            path: "Sources/DejaViiOS",
             exclude: ["Resources/Info.plist"],
             swiftSettings: [
                 .swiftLanguageMode(.v5)

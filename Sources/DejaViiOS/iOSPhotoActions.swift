@@ -4,7 +4,7 @@ import Photos
 import UIKit
 import AVKit
 import AVFoundation
-import PhotoSeekCore
+import DejaViCore
 
 @MainActor
 struct iOSPhotoActions: PhotoActionsProtocol {

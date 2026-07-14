@@ -1,5 +1,5 @@
 import SwiftUI
-import PhotoSeekCore
+import DejaViCore
 
 struct ContentView: View {
     @Bindable var viewModel: SearchViewModel
@@ -105,7 +105,7 @@ struct ContentView: View {
             Image(systemName: "sparkle.magnifyingglass")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
-            Text("PhotoSeek")
+            Text("DejaVi")
                 .font(.system(size: 22, weight: .semibold))
 
             if !SettingsManager.shared.hasApiKey {
@@ -133,7 +133,7 @@ struct ContentView: View {
                     .foregroundStyle(.green)
                     .font(.system(size: 13))
 
-                Text("Now index your photo library so PhotoSeek can search it.")
+                Text("Now index your photo library so DejaVi can search it.")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .padding(.top, 4)

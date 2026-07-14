@@ -1,6 +1,6 @@
 #if os(iOS)
 import SwiftUI
-import PhotoSeekCore
+import DejaViCore
 
 struct iOSContentView: View {
     @Bindable var viewModel: SearchViewModel

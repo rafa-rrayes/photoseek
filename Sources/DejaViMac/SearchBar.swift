@@ -1,6 +1,6 @@
 import SwiftUI
 import AppKit
-import PhotoSeekCore
+import DejaViCore
 
 struct WindowDragArea: NSViewRepresentable {
     func makeNSView(context: Context) -> DragView { DragView() }

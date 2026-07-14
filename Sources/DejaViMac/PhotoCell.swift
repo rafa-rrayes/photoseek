@@ -1,6 +1,6 @@
 import SwiftUI
 import AppKit
-import PhotoSeekCore
+import DejaViCore
 
 struct PhotoCell: View {
     let result: SearchResult
