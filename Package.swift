@@ -3,24 +3,24 @@
 import PackageDescription
 
 let package = Package(
-    name: "DejaVi",
+    name: "PhotoSeek",
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
-        .library(name: "DejaViCore", targets: ["DejaViCore"]),
+        .library(name: "PhotoSeekCore", targets: ["PhotoSeekCore"]),
     ],
     targets: [
         .target(
-            name: "DejaViCore",
-            path: "Sources/DejaViCore",
+            name: "PhotoSeekCore",
+            path: "Sources/PhotoSeekCore",
             swiftSettings: [
                 .swiftLanguageMode(.v5)
             ]
         ),
         .executableTarget(
-            name: "DejaViMac",
-            dependencies: ["DejaViCore"],
-            path: "Sources/DejaViMac",
-            exclude: ["Resources/Info.plist", "Resources/DejaVi.entitlements", "Resources/AppIcon.icns"],
+            name: "PhotoSeekMac",
+            dependencies: ["PhotoSeekCore"],
+            path: "Sources/PhotoSeekMac",
+            exclude: ["Resources/Info.plist", "Resources/PhotoSeek.entitlements", "Resources/AppIcon.icns"],
             resources: [
                 .copy("Resources/MenuBarIcon.png"),
                 .copy("Resources/MenuBarIcon@2x.png"),
@@ -30,9 +30,9 @@ let package = Package(
             ]
         ),
         // NOTE: The iOS app is built exclusively by the xcodegen-generated
-        // DejaVi.xcodeproj app target (sources in Sources/DejaViiOS, linking the
-        // DejaViCore library). It is deliberately NOT an SPM target — an
-        // executableTarget named "DejaViiOS" collides with the app scheme and
+        // PhotoSeek.xcodeproj app target (sources in Sources/PhotoSeekiOS, linking the
+        // PhotoSeekCore library). It is deliberately NOT an SPM target — an
+        // executableTarget named "PhotoSeekiOS" collides with the app scheme and
         // makes `xcodebuild archive` build a command-line tool (SKIP_INSTALL=YES)
         // instead of the app, producing an empty archive.
     ]

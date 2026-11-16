@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# DejaVi macOS release build, sign, notarize, staple, package.
+# PhotoSeek macOS release build, sign, notarize, staple, package.
 #
 # Stages:
 #   1. swift build (universal arm64 + x86_64 unless ARCHS overrides)
-#   2. Assemble DejaVi.app, copying SwiftPM resource bundles into
+#   2. Assemble PhotoSeek.app, copying SwiftPM resource bundles into
 #      Contents/Resources/ (canonical macOS layout). The app uses
 #      AppResourceBundle to locate them there instead of Bundle.module, whose
 #      SwiftPM-generated accessor expects the bundle at the .app root — a path
@@ -26,10 +26,10 @@
 #
 set -euo pipefail
 
-APP_NAME="DejaVi"
-SWIFT_PRODUCT="DejaViMac"
-PACKAGE_NAME="DejaVi"   # must match Package.swift `name:` (used for SwiftPM bundle naming)
-BUNDLE_ID="com.rafa.dejavi.mac"
+APP_NAME="PhotoSeek"
+SWIFT_PRODUCT="PhotoSeekMac"
+PACKAGE_NAME="PhotoSeek"   # must match Package.swift `name:` (used for SwiftPM bundle naming)
+BUNDLE_ID="com.rafa.photoseek.mac"
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="${ROOT}/build"
@@ -40,9 +40,9 @@ RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 DMG_PATH="${BUILD_DIR}/${APP_NAME}.dmg"
 DMG_STAGING="${BUILD_DIR}/dmg-staging"
 
-ENTITLEMENTS="${ROOT}/Sources/DejaViMac/Resources/DejaVi.entitlements"
-INFO_PLIST="${ROOT}/Sources/DejaViMac/Resources/Info.plist"
-APP_ICON="${ROOT}/Sources/DejaViMac/Resources/AppIcon.icns"
+ENTITLEMENTS="${ROOT}/Sources/PhotoSeekMac/Resources/PhotoSeek.entitlements"
+INFO_PLIST="${ROOT}/Sources/PhotoSeekMac/Resources/Info.plist"
+APP_ICON="${ROOT}/Sources/PhotoSeekMac/Resources/AppIcon.icns"
 
 ARCHS="${ARCHS:-arm64 x86_64}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:-}"
@@ -175,8 +175,8 @@ if [[ -n "${SIGNING_IDENTITY}" ]]; then
     codesign --verify --deep --strict --verbose=2 "${APP_BUNDLE}"
 else
     echo "==> No Developer ID Application identity found; producing UNSIGNED app."
-    echo "    This DMG will trigger Gatekeeper 'damaged' on customer Macs."
-    echo "    See RELEASE.md for how to obtain the cert."
+    echo "    This DMG will trigger Gatekeeper 'damaged' on other Macs."
+    echo "    Set SIGNING_IDENTITY (Developer ID Application) to sign it."
 fi
 
 # -----------------------------------------------------------------------------
