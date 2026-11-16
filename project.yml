@@ -1,4 +1,4 @@
-name: DejaVi
+name: PhotoSeek
 options:
   bundleIdPrefix: com.rafa
   deploymentTarget:
@@ -7,23 +7,23 @@ options:
   generateEmptyDirectories: false
 
 packages:
-  DejaVi:
+  PhotoSeek:
     path: .
 
 targets:
-  DejaViiOS:
+  PhotoSeekiOS:
     type: application
     platform: iOS
     sources:
-      - path: Sources/DejaViiOS
+      - path: Sources/PhotoSeekiOS
         excludes:
           - "Resources/**"
-      - path: Sources/DejaViiOS/Resources/Assets.xcassets
+      - path: Sources/PhotoSeekiOS/Resources/Assets.xcassets
         buildPhase: resources
     info:
-      path: Sources/DejaViiOS/Resources/Info.plist
+      path: Sources/PhotoSeekiOS/Resources/Info.plist
       properties:
-        CFBundleDisplayName: DejaVi
+        CFBundleDisplayName: PhotoSeek
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "3"
         LSRequiresIPhoneOS: true
@@ -37,8 +37,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        NSPhotoLibraryUsageDescription: DejaVi needs access to your photo library to index and search your photos.
-        NSPhotoLibraryAddUsageDescription: DejaVi needs permission to create albums and organize your photos.
+        NSPhotoLibraryUsageDescription: PhotoSeek needs access to your photo library to index and search your photos.
+        NSPhotoLibraryAddUsageDescription: PhotoSeek needs permission to create albums and organize your photos.
         ITSAppUsesNonExemptEncryption: false
         UIBackgroundModes:
           - processing
@@ -46,15 +46,14 @@ targets:
           - com.rafa.dejavi.indexing
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.rafa.dejavi
-        PRODUCT_NAME: DejaVi
+        PRODUCT_BUNDLE_IDENTIFIER: com.rafa.dejavi  # kept: existing App Store Connect registration; change to your own ID
+        PRODUCT_NAME: PhotoSeek
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5"
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: N7Z47ZX3FQ
-        INFOPLIST_FILE: Sources/DejaViiOS/Resources/Info.plist
+        INFOPLIST_FILE: Sources/PhotoSeekiOS/Resources/Info.plist
         GENERATE_INFOPLIST_FILE: false
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: ""
     dependencies:
-      - package: DejaVi
-        product: DejaViCore
+      - package: PhotoSeek
+        product: PhotoSeekCore
